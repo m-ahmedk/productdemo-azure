@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ProductDemo.Models;
 
 namespace ProductDemo.Controllers;
 
