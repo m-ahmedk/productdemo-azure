@@ -1,4 +1,4 @@
-namespace ProductDemo;
+namespace ProductDemo.Models;
 
 public class WeatherForecast
 {

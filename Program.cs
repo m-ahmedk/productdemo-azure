@@ -1,11 +1,18 @@
 using Microsoft.EntityFrameworkCore;
 using ProductDemo.Data;
+using ProductDemo.Extensions;
+using ProductDemo.Logging;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+LogConfigurator.ConfigureLogging(builder.Configuration);
+builder.Host.UseSerilog();
 
 // Add services to the container.
 
 builder.Services.AddControllers();
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -14,10 +21,15 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"{connectionString}"));
 
-
 // Register Swagger Services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Register Repositories, Services, Validators and Mappings via custom made Service Extension
+builder.Services.AddProjectRepositories();
+builder.Services.AddProjectServices();
+builder.Services.AddProjectValidators();
+builder.Services.AddProjectMappings();
 
 var app = builder.Build();
 

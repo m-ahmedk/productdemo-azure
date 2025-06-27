@@ -1,6 +1,8 @@
-﻿namespace ProductDemo.Models
+﻿using ProductDemo.Contracts.Product;
+
+namespace ProductDemo.DTOs.Product
 {
-    public class Product : BaseEntity
+    public class UpdateProductDto : IProductInput
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;

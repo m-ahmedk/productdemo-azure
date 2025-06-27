@@ -1,4 +1,4 @@
-﻿namespace ProductDemo.DTOs
+﻿namespace ProductDemo.DTOs.AppUser
 {
     public class AppUserDTO
     {
