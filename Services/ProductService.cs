@@ -1,64 +1,52 @@
-﻿using AutoMapper;
-using FluentValidation;
-using ProductDemo.DTOs.Product;
-using ProductDemo.Models;
+﻿using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
 using ProductDemo.Services.Interfaces;
 
-namespace ProductDemo.Services
+public class ProductService : IProductService
 {
-    public class ProductService : IProductService
+    private readonly IProductRepository _repository;
+
+    public ProductService(IProductRepository repository)
     {
-        private readonly IProductRepository _repository;
-        private readonly IMapper _mapper;
+        _repository = repository;
+    }
 
-        public ProductService(IProductRepository repository, IMapper mapper)
-        {
-            _repository = repository;
-            _mapper = mapper;
-        }
+    public async Task<Product> AddAsync(Product product)
+    {
+        var exists = await _repository.ExistsByNameAsync(product.Name);
+        if (exists)
+            throw new InvalidOperationException("Product name must be unique");
 
-        public async Task<ProductDto> AddAsync(CreateProductDto createProductDto)
-        {
-            var exists = await _repository.ExistsByNameAsync(createProductDto.Name);
-            if (exists) throw new InvalidOperationException($"Product name must be unique");
+        await _repository.AddAsync(product);
+        return product;
+    }
 
-            var product = _mapper.Map<Product>(createProductDto);
-            
-            await _repository.AddAsync(product);
-            
-            return _mapper.Map<ProductDto>(product);
-        }
+    public async Task<bool> DeleteAsync(int id)
+    {
+        if (id <= 0)
+            throw new ArgumentException("Invalid Product ID");
 
-        public async Task<bool> DeleteAsync(int id)
-        {
-            if (id <= 0) throw new ArgumentException("Invalid Product ID");
-            
-            return await _repository.DeleteAsync(id);
-        }
+        return await _repository.DeleteAsync(id);
+    }
 
-        public async Task<IEnumerable<Product>> GetAllAsync()
-        {
-            return await _repository.GetAllAsync();
-        }
+    public async Task<IEnumerable<Product>> GetAllAsync()
+    {
+        return await _repository.GetAllAsync();
+    }
 
-        public async Task<ProductDto?> GetByIdAsync(int id)
-        {
-            if (id <= 0) throw new ArgumentException("Invalid Product ID");
-            Product? product = await _repository.GetByIdAsync(id);
+    public async Task<Product?> GetByIdAsync(int id)
+    {
+        if (id <= 0)
+            throw new ArgumentException("Invalid Product ID");
 
-            return _mapper.Map<ProductDto>(product);
-        }
+        return await _repository.GetByIdAsync(id);
+    }
 
-        public async Task<bool> UpdateAsync(UpdateProductDto updateProductDto)
-        {
-            if (updateProductDto == null) throw new ArgumentException("Product is not provided");
+    public async Task<bool> UpdateAsync(Product product)
+    {
+        if (product == null || product.Id <= 0)
+            throw new ArgumentException("Invalid product");
 
-            if (updateProductDto.Id <= 0) throw new ArgumentException("Invalid Product ID");
-
-            bool isUpdated = await _repository.UpdateAsync(product);
-
-            return ;
-        }
+        return await _repository.UpdateAsync(product);
     }
 }

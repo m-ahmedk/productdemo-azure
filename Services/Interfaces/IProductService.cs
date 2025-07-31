@@ -1,15 +1,13 @@
-﻿using ProductDemo.DTOs.Product;
-using ProductDemo.Models;
+﻿using ProductDemo.Models;
 
 namespace ProductDemo.Services.Interfaces
 {
     public interface IProductService
     {
         Task<IEnumerable<Product>> GetAllAsync();
-        Task<ProductDto?> GetByIdAsync(int id);
-        Task<ProductDto> AddAsync(CreateProductDto createProductDto);
-        Task<bool> UpdateAsync(UpdateProductDto updateProductDto);
+        Task<Product?> GetByIdAsync(int id);
+        Task<Product> AddAsync(Product product);
+        Task<bool> UpdateAsync(Product product);
         Task<bool> DeleteAsync(int id);
-
     }
 }

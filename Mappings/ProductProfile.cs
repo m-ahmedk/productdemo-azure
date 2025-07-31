@@ -13,7 +13,7 @@ namespace ProductDemo.Mappings
             CreateMap<UpdateProductDto, Product>();
 
             // Entity to DTO
-            CreateMap<Product, ProductDto>();
+            CreateMap<Product, BaseProductDto>();
         }
     }
 }

@@ -16,8 +16,7 @@ namespace ProductDemo.Repositories
 
         public async Task<Product> AddAsync(Product product)
         {
-            // _context.Products.Add(product); real code
-            await _context.Products.AddAsync(product); // mine
+            await _context.Products.AddAsync(product);
             await _context.SaveChangesAsync();
             return product;
         }
@@ -27,24 +26,27 @@ namespace ProductDemo.Repositories
             var product = await _context.Products.FindAsync(id);
             if (product == null) return false;
 
+            // Soft delete logic – let AppDbContext handle it (already done in SaveChangesAsync)
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
-            
             return true;
         }
 
         public async Task<IEnumerable<Product>> GetAllAsync()
         {
-            return await _context.Products.ToListAsync();
+            return await _context.Products.AsNoTracking().ToListAsync();
         }
 
         public async Task<Product?> GetByIdAsync(int id)
         {
-            return await _context.Products.FindAsync(id);
+            return await _context.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
         }
 
-        public async Task<Product> UpdateAsync(Product product)
+        public async Task<bool> UpdateAsync(Product product)
         {
+            var exists = await _context.Products.AnyAsync(p => p.Id == product.Id);
+            if (!exists) return false;
+
             _context.Products.Update(product);
             await _context.SaveChangesAsync();
             return true;

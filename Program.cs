@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ProductDemo.Data;
 using ProductDemo.Extensions;
 using ProductDemo.Logging;
+using ProductDemo.Middlewares;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,7 +20,7 @@ builder.Services.AddOpenApi();
 // Register DB Context
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"{connectionString}"));
+    options.UseSqlServer($"{connectionString}"));
 
 // Register Swagger Services
 builder.Services.AddEndpointsApiExplorer();
@@ -39,7 +40,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// Use Swagger middleware here
+// Add your custom middleware early in the pipeline
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Use Swagger middleware here, can be inside IsDevelopment if only for Development
 app.UseSwagger();
 app.UseSwaggerUI(); // This enables browser testing
 
