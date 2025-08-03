@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using ProductDemo.Data;
 using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
@@ -8,10 +9,12 @@ namespace ProductDemo.Repositories
     public class ProductRepository : IProductRepository
     {
         private readonly AppDbContext _context;
+        private readonly IMapper _mapper;
 
-        public ProductRepository(AppDbContext context)
+        public ProductRepository(AppDbContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         public async Task<Product> AddAsync(Product product)
@@ -44,10 +47,7 @@ namespace ProductDemo.Repositories
 
         public async Task<bool> UpdateAsync(Product product)
         {
-            var exists = await _context.Products.AnyAsync(p => p.Id == product.Id);
-            if (!exists) return false;
-
-            _context.Products.Update(product);
+            _context.Products.Update(product); // Tracking already set in controller via fetch
             await _context.SaveChangesAsync();
             return true;
         }

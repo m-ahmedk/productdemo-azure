@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using ProductDemo.Exceptions;
+using System.Net;
 using System.Text.Json;
 
 namespace ProductDemo.Middlewares
@@ -20,6 +21,21 @@ namespace ProductDemo.Middlewares
             {
                 await _next(context); // proceed to next
             }
+            catch (AppException ex)
+            {
+                _logger.LogError(ex, "Handled exception occurred");
+
+                context.Response.StatusCode = ex.StatusCode;
+                context.Response.ContentType = "application/json";
+
+                var response = new
+                {
+                    Message = "An error occurred handled by AppException.",
+                    Details = ex.Message // Optional: Only show in Development
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unhandled exception occurred");
@@ -37,4 +53,5 @@ namespace ProductDemo.Middlewares
             }
         }
     }
+
 }

@@ -3,8 +3,8 @@ using ProductDemo.Models;
 
 namespace ProductDemo.Controllers;
 
-[ApiController]
-[Route("[controller]")]
+//[ApiController]
+//[Route("[controller]")]
 public class WeatherForecastController : ControllerBase
 {
     private static readonly string[] Summaries = new[]
@@ -31,6 +31,7 @@ public class WeatherForecastController : ControllerBase
         .ToArray();
     }
 
+    [NonAction]
     [HttpGet("env")]
     public IActionResult GetEnv([FromServices] IWebHostEnvironment env)
     {

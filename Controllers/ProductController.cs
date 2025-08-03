@@ -67,16 +67,23 @@ namespace ProductDemo.Controllers
             }
         }
 
-        [HttpPut]
+        [HttpPatch]
         public async Task<IActionResult> Update(UpdateProductDto dto)
         {
-            _logger.LogInformation("PUT update product called with ID: {ProductId}", dto.Id);
+            _logger.LogInformation("PATCH update product called with ID: {ProductId}", dto.Id);
 
             try
             {
-                var product = _mapper.Map<Product>(dto);
+                // Get existing entity from DB
+                var product = await _productService.GetByIdAsync(dto.Id);
+                if (product == null)
+                    return NotFound();
+
+                // Map non-null fields only
+                _mapper.Map(dto, product);
+
                 var result = await _productService.UpdateAsync(product);
-                return result ? NoContent() : NotFound();
+                return result ? NoContent() : StatusCode(500, "Update failed.");
             }
             catch (Exception ex)
             {
@@ -84,6 +91,7 @@ namespace ProductDemo.Controllers
                 throw;
             }
         }
+
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
