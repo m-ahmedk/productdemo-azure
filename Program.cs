@@ -22,11 +22,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer($"{connectionString}"));
 
-// Register Swagger Services
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-// Register Repositories, Services, Validators and Mappings via custom made Service Extension
+// Register Swagger Services, Repositories, Services, Validators and Mappings via custom made Service Extension
+builder.Services.AddSwaggerDocument();
+builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddProjectRepositories();
 builder.Services.AddProjectServices();
 builder.Services.AddProjectValidators();
@@ -49,6 +47,8 @@ app.UseSwaggerUI(); // This enables browser testing
 
 app.UseHttpsRedirection();
 
+// request pipeline execution
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

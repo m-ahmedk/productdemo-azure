@@ -1,11 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ProductDemo.DTOs.Product;
-using ProductDemo.Services.Interfaces;
-using AutoMapper;
 using ProductDemo.Models;
+using ProductDemo.Services.Interfaces;
 
 namespace ProductDemo.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class ProductController : ControllerBase
