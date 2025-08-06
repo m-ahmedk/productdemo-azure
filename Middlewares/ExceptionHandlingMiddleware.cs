@@ -1,56 +1,51 @@
 ﻿using ProductDemo.Exceptions;
+using ProductDemo.Helpers;
 using System.Net;
 using System.Text.Json;
 
-namespace ProductDemo.Middlewares
+namespace ProductDemo.Middlewares;
+
+public class ExceptionHandlingMiddleware
 {
-    public class ExceptionHandlingMiddleware
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+
+    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
-        private readonly RequestDelegate _next;
-        private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+        _next = next;
+        _logger = logger;
+    }
 
-        public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
+    public async Task Invoke(HttpContext context)
+    {
+        try
         {
-            _next = next; // This is the next middleware in the pipeline
-            _logger = logger;
+            await _next(context); // Continue pipeline
         }
-
-        public async Task Invoke(HttpContext context)
+        catch (AppException ex)
         {
-            try
-            {
-                await _next(context); // proceed to next
-            }
-            catch (AppException ex)
-            {
-                _logger.LogError(ex, "Handled exception occurred");
+            _logger.LogError(ex, "Handled AppException");
 
-                context.Response.StatusCode = ex.StatusCode;
-                context.Response.ContentType = "application/json";
+            context.Response.StatusCode = ex.StatusCode;
+            context.Response.ContentType = "application/json";
 
-                var response = new
-                {
-                    Message = "An error occurred handled by AppException.",
-                    Details = ex.Message // Optional: Only show in Development
-                };
+            var response = ApiResponse<string>.FailResponse(
+                ex.Errors ?? new List<string> { ex.Message },
+                ex.Message
+            );
 
-                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unhandled exception occurred");
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception");
 
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                context.Response.ContentType = "application/json";
+            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            context.Response.ContentType = "application/json";
 
-                var response = new
-                {
-                    Message = "An unexpected error occurred. Please try again later.",
-                    Details = ex.Message // Optional: Only show in Development
-                };
+            var response = ApiResponse<string>.FailResponse("Internal server error.", "An unexpected error occurred. Please try again later.");
 
-                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
-            }
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
         }
     }
 }

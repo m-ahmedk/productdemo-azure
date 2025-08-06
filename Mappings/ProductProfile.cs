@@ -22,6 +22,7 @@ namespace ProductDemo.Mappings
 
             // Entity to DTO
             CreateMap<Product, BaseProductDto>();
+            CreateMap<Product, ProductDto>();
         }
     }
 }

@@ -1,14 +1,15 @@
 ﻿using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using ProductDemo.DTOs.Product;
+using ProductDemo.Helpers;
 using ProductDemo.Repositories;
 using ProductDemo.Repositories.Interfaces;
 using ProductDemo.Services;
 using ProductDemo.Services.Interfaces;
-using ProductDemo.Validators.Product;
+using ProductDemo.Validators.Auth;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -44,14 +45,14 @@ namespace ProductDemo.Extensions
 
                             context.Response.StatusCode = 401;
                             context.Response.ContentType = "application/json";
-                            var result = JsonSerializer.Serialize(new { error = "Authentication failed." });
+                            var result = JsonSerializer.Serialize(ApiResponse<string>.FailResponse("Authentication failed."));
                             return context.Response.WriteAsync(result);
                         },
                         OnForbidden = context =>
                         {
                             context.Response.StatusCode = 403;
                             context.Response.ContentType = "application/json";
-                            var result = JsonSerializer.Serialize(new { error = "You are not authorized to access this resource" });
+                            var result = JsonSerializer.Serialize(ApiResponse<string>.FailResponse("You are not authorized to access this resource"));
                             return context.Response.WriteAsync(result);
                         }
                     };
@@ -119,8 +120,16 @@ namespace ProductDemo.Extensions
         public static IServiceCollection AddProjectValidators(this IServiceCollection services)
         {
             services.AddFluentValidationAutoValidation();
-            services.AddScoped<IValidator<CreateProductDto>, CreateProductDtoValidator>();
-            services.AddScoped<IValidator<UpdateProductDto>, UpdateProductDtoValidator>();
+            services.Configure<ApiBehaviorOptions>(options =>
+            {
+                options.SuppressModelStateInvalidFilter = true; // turn off auto-validation, manual validation preferred
+            });
+            services.AddValidatorsFromAssemblyContaining<RegisterDtoValidator>();
+            //services.AddScoped<IValidator<CreateProductDto>, CreateProductDtoValidator>();
+            //services.AddScoped<IValidator<UpdateProductDto>, UpdateProductDtoValidator>();
+            //services.AddScoped<IValidator<RegisterDto>, RegisterDtoValidator>();
+            //services.AddScoped<IValidator<LoginDto>, LoginDtoValidator>();
+
 
             return services;
         }

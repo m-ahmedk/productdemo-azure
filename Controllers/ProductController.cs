@@ -1,107 +1,100 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductDemo.DTOs.Product;
+using ProductDemo.Helpers;
 using ProductDemo.Models;
 using ProductDemo.Services.Interfaces;
 
-namespace ProductDemo.Controllers
+namespace ProductDemo.Controllers;
+
+[Authorize(Roles = "Admin")]
+[ApiController]
+[Route("api/[controller]")]
+public class ProductController : ControllerBase
 {
-    [Authorize (Roles = "Admin")]
-    [ApiController]
-    [Route("api/[controller]")]
-    public class ProductController : ControllerBase
+    private readonly IProductService _productService;
+    private readonly ILogger<ProductController> _logger;
+    private readonly IMapper _mapper;
+    private readonly IValidator<CreateProductDto> _createValidator;
+    private readonly IValidator<UpdateProductDto> _updateValidator;
+
+    public ProductController(
+        IProductService productService,
+        ILogger<ProductController> logger,
+        IMapper mapper,
+        IValidator<CreateProductDto> createValidator,
+        IValidator<UpdateProductDto> updateValidator)
     {
-        private readonly IProductService _productService;
-        private readonly ILogger<ProductController> _logger;
-        private readonly IMapper _mapper;
+        _productService = productService;
+        _logger = logger;
+        _mapper = mapper;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
+    }
 
-        public ProductController(IProductService productService, ILogger<ProductController> logger, IMapper mapper)
-        {
-            _productService = productService;
-            _logger = logger;
-            _mapper = mapper;
-        }
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        _logger.LogInformation("GET all products requested.");
 
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
-        {
-            _logger.LogInformation("GET all products requested.");
-            var products = await _productService.GetAllAsync();
-            return Ok(products);
-        }
+        var products = await _productService.GetAllAsync();
+        var productDtos = _mapper.Map<List<ProductDto>>(products);
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            _logger.LogInformation("GET product by ID: {ProductId}", id);
+        return Ok(ApiResponse<List<ProductDto>>.SuccessResponse(productDtos));
+    }
 
-            var product = await _productService.GetByIdAsync(id);
-            if (product == null)
-            {
-                _logger.LogWarning("Product not found for ID: {ProductId}", id);
-                return NotFound();
-            }
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(int id)
+    {
+        _logger.LogInformation("GET product by ID: {ProductId}", id);
 
-            return Ok(product);
-        }
+        var product = await _productService.GetByIdAsync(id);
+        var dto = _mapper.Map<ProductDto>(product);
 
-        [HttpPost]
-        public async Task<IActionResult> Create(CreateProductDto dto)
-        {
-            _logger.LogInformation("POST create product called with name: {ProductName}", dto.Name);
+        return Ok(ApiResponse<ProductDto>.SuccessResponse(dto));
+    }
 
-            try
-            {
-                var product = _mapper.Map<Product>(dto);
-                var created = await _productService.AddAsync(product);
-                return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogWarning(ex, "Product creation failed due to business rule violation.");
-                return BadRequest(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while creating the product.");
-                throw; // GlobalExceptionMiddleware will catch
-            }
-        }
+    [HttpPost]
+    public async Task<IActionResult> Create(CreateProductDto dto)
+    {
+        _logger.LogInformation("POST create product called with name: {ProductName}", dto.Name);
 
-        [HttpPatch]
-        public async Task<IActionResult> Update(UpdateProductDto dto)
-        {
-            _logger.LogInformation("PATCH update product called with ID: {ProductId}", dto.Id);
+        var fail = await ValidationHelper.ValidateAndFormatAsync(_createValidator, dto);
+        if (fail != null) return fail;
 
-            try
-            {
-                // Get existing entity from DB
-                var product = await _productService.GetByIdAsync(dto.Id);
-                if (product == null)
-                    return NotFound();
+        var product = _mapper.Map<Product>(dto);
+        var created = await _productService.AddAsync(product);
+        var productDto = _mapper.Map<ProductDto>(created);
 
-                // Map non-null fields only
-                _mapper.Map(dto, product);
+        return CreatedAtAction(nameof(GetById), new { id = created.Id },
+            ApiResponse<ProductDto>.SuccessResponse(productDto));
+    }
 
-                var result = await _productService.UpdateAsync(product);
-                return result ? NoContent() : StatusCode(500, "Update failed.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error while updating product with ID: {ProductId}", dto.Id);
-                throw;
-            }
-        }
+    [HttpPatch]
+    public async Task<IActionResult> Update(UpdateProductDto dto)
+    {
+        _logger.LogInformation("PATCH update product called with ID: {ProductId}", dto.Id);
 
+        var fail = await ValidationHelper.ValidateAndFormatAsync(_updateValidator, dto);
+        if (fail != null) return fail;
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            _logger.LogInformation("DELETE product by ID: {ProductId}", id);
+        var product = await _productService.GetByIdAsync(dto.Id); // Throws if not found
+        _mapper.Map(dto, product);
 
-            var result = await _productService.DeleteAsync(id);
-            return result ? NoContent() : NotFound();
-        }
+        await _productService.UpdateAsync(product);
+
+        var updatedDto = _mapper.Map<ProductDto>(product);
+        return Ok(ApiResponse<ProductDto>.SuccessResponse(updatedDto, "Product updated successfully"));
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        _logger.LogInformation("DELETE product by ID: {ProductId}", id);
+
+        await _productService.DeleteAsync(id);
+        return Ok(ApiResponse<string>.SuccessResponse("Product deleted successfully"));
     }
 }

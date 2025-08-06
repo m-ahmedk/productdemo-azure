@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization.Infrastructure;
-using Microsoft.EntityFrameworkCore;
-using ProductDemo.Helpers;
+﻿using ProductDemo.Helpers;
 using ProductDemo.Models;
 
 namespace ProductDemo.Data
