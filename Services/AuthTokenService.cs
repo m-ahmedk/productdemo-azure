@@ -1,4 +1,6 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using ProductDemo.Data;
 using ProductDemo.Models;
 using ProductDemo.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
@@ -10,19 +12,35 @@ namespace ProductDemo.Services
     public class AuthTokenService : IAuthTokenService
     {
         private readonly IConfiguration _config;
+        private readonly AppDbContext _context;
 
-        public AuthTokenService(IConfiguration config)
+        public AuthTokenService(IConfiguration config, AppDbContext context)
         {
             _config = config;
+            _context = context;
         }
 
         public string CreateToken(AppUser user)
         {
-            var claims = new[]
+            var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email)
             };
+
+            // add user role to claims
+            var userWithRoles = _context.Users
+                                .Include(u => u.UserRoles) // from userroles
+                                .ThenInclude(u => u.Role) // get role
+                                .FirstOrDefault(u => u.Id == user.Id); // of the following user
+
+            if(userWithRoles != null)
+            {
+                foreach (var role in userWithRoles.UserRoles)
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, role.Role.Name));
+                }
+            }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

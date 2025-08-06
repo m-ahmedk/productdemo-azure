@@ -1,0 +1,58 @@
+﻿using Microsoft.AspNetCore.Authorization.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using ProductDemo.Helpers;
+using ProductDemo.Models;
+
+namespace ProductDemo.Data
+{
+    public static class DbInitializer
+    {
+        public static void Seed(IServiceProvider service)
+        {
+            using var scope = service.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            SeedRoles(context);
+            SeedUsers(context);
+        }
+
+        public static void SeedRoles(AppDbContext context)
+        {
+            if (!context.Roles.Any())
+            {
+                var roles = new List<Role>()
+                {
+                    new Role { Name = "Admin" },
+                    new Role {Name = "User"}
+                };
+
+                context.Roles.AddRange(roles);
+                context.SaveChanges();
+            }
+        }
+
+        public static void SeedUsers(AppDbContext context)
+        {
+            if (!context.Users.Any())
+            {
+                var (hash, salt) = HashHelper.HashPassword("ahmed123#");
+
+                var user = new AppUser {
+                    Email = "mahmedvilla@gmail.com",
+                    PasswordHash = hash,
+                    PasswordStamp = salt,
+                    UserRoles = new List<UserRole>()
+                };
+
+                // Assign role to user
+                Role? adminRole = context.Roles.FirstOrDefault(x => x.Name == "Admin");
+                if (adminRole != null) {
+                    user.UserRoles.Add(new UserRole { Role = adminRole });
+                }
+
+                context.Users.Add(user);
+                context.SaveChanges();
+            }
+        }
+    }
+}

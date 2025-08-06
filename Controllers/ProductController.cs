@@ -7,7 +7,7 @@ using ProductDemo.Services.Interfaces;
 
 namespace ProductDemo.Controllers
 {
-    [Authorize]
+    [Authorize (Roles = "Admin")]
     [ApiController]
     [Route("api/[controller]")]
     public class ProductController : ControllerBase

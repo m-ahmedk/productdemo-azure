@@ -6,5 +6,6 @@
         public string Email { get; set; } = string.Empty;
         public byte[] PasswordHash { get; set; }
         public byte[] PasswordStamp { get; set; }
+        public List<UserRole> UserRoles { get; set; } = new();
     }
 }
