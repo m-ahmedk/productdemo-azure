@@ -7,7 +7,7 @@ namespace ProductDemo.Data
 {
     public static class DbInitializer
     {
-        public async static void Seed(IServiceProvider service)
+        public async static Task Seed(IServiceProvider service)
         {
             using var scope = service.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
