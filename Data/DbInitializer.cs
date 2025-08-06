@@ -7,16 +7,16 @@ namespace ProductDemo.Data
 {
     public static class DbInitializer
     {
-        public static void Seed(IServiceProvider service)
+        public async static void Seed(IServiceProvider service)
         {
             using var scope = service.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            SeedRoles(context);
-            SeedUsers(context);
+            await SeedRoles(context);
+            await SeedUsers(context);
         }
 
-        public static void SeedRoles(AppDbContext context)
+        public async static Task SeedRoles(AppDbContext context)
         {
             if (!context.Roles.Any())
             {
@@ -26,12 +26,12 @@ namespace ProductDemo.Data
                     new Role {Name = "User"}
                 };
 
-                context.Roles.AddRange(roles);
-                context.SaveChanges();
+                await context.Roles.AddRangeAsync(roles);
+                await context.SaveChangesAsync();
             }
         }
 
-        public static void SeedUsers(AppDbContext context)
+        public async static Task SeedUsers(AppDbContext context)
         {
             if (!context.Users.Any())
             {
@@ -50,8 +50,8 @@ namespace ProductDemo.Data
                     user.UserRoles.Add(new UserRole { Role = adminRole });
                 }
 
-                context.Users.Add(user);
-                context.SaveChanges();
+                await context.Users.AddAsync(user);
+                await context.SaveChangesAsync();
             }
         }
     }
