@@ -124,7 +124,7 @@ namespace ProductDemo.Extensions
             {
                 options.SuppressModelStateInvalidFilter = true; // turn off auto-validation, manual validation preferred
             });
-            services.AddValidatorsFromAssemblyContaining<RegisterDtoValidator>();
+            services.AddValidatorsFromAssemblyContaining<RegisterDtoValidator>(); // registers all validators
             //services.AddScoped<IValidator<CreateProductDto>, CreateProductDtoValidator>();
             //services.AddScoped<IValidator<UpdateProductDto>, UpdateProductDtoValidator>();
             //services.AddScoped<IValidator<RegisterDto>, RegisterDtoValidator>();

@@ -1,6 +1,5 @@
 ﻿using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
-using ProductDemo.Services.Interfaces;
 using ProductDemo.Exceptions;
 
 namespace ProductDemo.Services;
