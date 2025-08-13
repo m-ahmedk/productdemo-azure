@@ -1,6 +1,6 @@
-Logs/
-bin/
-obj/
+**/Logs/
+**/bin/
+**/obj/
 .vs/
 *.user
 *.suo
