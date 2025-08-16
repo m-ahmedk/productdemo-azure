@@ -22,7 +22,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer($"{connectionString}"));
 
-// Register Swagger Services, Repositories, Services, Validators and Mappings via custom made Service Extension
+// Register Model Binders, Swagger Services, Repositories, Services, Validators and Mappings via custom made Service Extension
+builder.Services.AddCustomBinders();
+builder.Services.AddCustomJsonConverters();
 builder.Services.AddSwaggerDocument();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddProjectRepositories();

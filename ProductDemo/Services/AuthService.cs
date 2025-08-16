@@ -1,27 +1,26 @@
-﻿using Microsoft.EntityFrameworkCore;
-using ProductDemo.Data;
-using ProductDemo.DTOs.Auth;
+﻿using ProductDemo.DTOs.Auth;
 using ProductDemo.Exceptions;
 using ProductDemo.Helpers;
 using ProductDemo.Models;
+using ProductDemo.Repositories.Interfaces;
 using ProductDemo.Services.Interfaces;
 
 namespace ProductDemo.Services
 {
     public class AuthService : IAuthService
     {
-        private readonly AppDbContext _context;
+        private readonly IUserRepository _userRepository;
         private readonly IAuthTokenService _tokenService;
 
-        public AuthService(AppDbContext context, IAuthTokenService tokenService)
+        public AuthService(IUserRepository userRepository, IAuthTokenService tokenService)
         {
-            _context = context;
+            _userRepository = userRepository;
             _tokenService = tokenService;
         }
 
         public async Task<AppUser> RegisterAsync(RegisterDto dto)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            if (await _userRepository.ExistsByEmailAsync(dto.Email))
                 throw new AppException("Email already exists");
 
             var (hash, salt) = HashHelper.HashPassword(dto.Password);
@@ -33,15 +32,12 @@ namespace ProductDemo.Services
                 PasswordStamp = salt
             };
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return user;
+            return await _userRepository.AddAsync(user);
         }
 
         public async Task<string> LoginAsync(LoginDto dto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email.ToLowerInvariant());
+            var user = await _userRepository.GetByEmailAsync(dto.Email);
             if (user == null) throw new AppException("Invalid credentials");
 
             var isValid = HashHelper.VerifyPassword(dto.Password, user.PasswordHash, user.PasswordStamp);
@@ -50,5 +46,4 @@ namespace ProductDemo.Services
             return _tokenService.CreateToken(user);
         }
     }
-
 }

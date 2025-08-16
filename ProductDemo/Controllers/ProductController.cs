@@ -9,7 +9,8 @@ using ProductDemo.Services.Interfaces;
 
 namespace ProductDemo.Controllers;
 
-[Authorize(Roles = "Admin")]
+//[Authorize(Roles = "Admin")]
+[AllowAnonymous] // for on-going development
 [ApiController]
 [Route("api/[controller]")]
 public class ProductController : ControllerBase

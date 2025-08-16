@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using ProductDemo.Converters;
 using ProductDemo.Helpers;
 using ProductDemo.Repositories;
 using ProductDemo.Repositories.Interfaces;
@@ -18,6 +19,29 @@ namespace ProductDemo.Extensions
 {
     public static class ServiceExtension
     {
+        public static IServiceCollection AddCustomBinders(this IServiceCollection services)
+        {
+            services.AddControllers(options =>
+            {
+                options.ModelBinderProviders.Insert(0, new CleanStringModelBinderProvider());
+            });
+
+            return services;
+        }
+
+        public static IServiceCollection AddCustomJsonConverters(this IServiceCollection services)
+        {
+            services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.Converters.Add(new CleanStringJsonConverter());
+            options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            options.JsonSerializerOptions.WriteIndented = true;
+        });
+
+            return services;
+        }
+
         public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddAuthentication("Bearer")
@@ -104,6 +128,7 @@ namespace ProductDemo.Extensions
         public static IServiceCollection AddProjectRepositories(this IServiceCollection services)
         {
             services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<IUserRepository, UserRepository>();
 
             return services;
         }
@@ -136,6 +161,17 @@ namespace ProductDemo.Extensions
 
         public static IServiceCollection AddProjectMappings(this IServiceCollection services)
         {
+            services.AddAutoMapper(cfg =>
+            {
+                // globally ignore EF base entity properties, managed by system (appdbcontext)
+                cfg.AddGlobalIgnore("CreatedAt");
+                cfg.AddGlobalIgnore("LastModifiedAt");
+                cfg.AddGlobalIgnore("IsDeleted");
+                cfg.AddGlobalIgnore("DeletedAt");
+                cfg.AddGlobalIgnore("Id");
+
+            }, Assembly.GetExecutingAssembly());
+
             services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
             return services;
