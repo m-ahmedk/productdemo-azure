@@ -10,7 +10,7 @@ namespace ProductDemo.Tests.Helpers
         public void HashPassword_ShouldReturn_HashAndSalt()
         {
             // Arrange
-            var password = "MySecret123!";
+            var password = "UnitTestPassword#!";
 
             // Act
             var (hash, salt) = HashHelper.HashPassword(password);
