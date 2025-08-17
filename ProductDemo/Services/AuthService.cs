@@ -4,6 +4,7 @@ using ProductDemo.Helpers;
 using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
 using ProductDemo.Services.Interfaces;
+using System.Net;
 
 namespace ProductDemo.Services
 {
@@ -38,10 +39,10 @@ namespace ProductDemo.Services
         public async Task<string> LoginAsync(LoginDto dto)
         {
             var user = await _userRepository.GetByEmailAsync(dto.Email);
-            if (user == null) throw new AppException("Invalid credentials");
+            if (user == null) throw new AppException("Invalid credentials", (int)HttpStatusCode.Unauthorized);
 
             var isValid = HashHelper.VerifyPassword(dto.Password, user.PasswordHash, user.PasswordStamp);
-            if (!isValid) throw new AppException("Invalid credentials");
+            if (!isValid) throw new AppException("Invalid credentials", (int)HttpStatusCode.Unauthorized);
 
             return _tokenService.CreateToken(user);
         }

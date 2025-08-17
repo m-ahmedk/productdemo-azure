@@ -1,6 +1,9 @@
-﻿using ProductDemo.Contracts.Product;
-
-namespace ProductDemo.DTOs.Product
+﻿namespace ProductDemo.DTOs.Product
 {
-    public class CreateProductDto : BaseProductDto { }
+    public class CreateProductDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public decimal Quantity { get; set; }
+    }
 }

@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ProductDemo.Data;
 using ProductDemo.Models;
 using ProductDemo.Services;
@@ -9,28 +10,18 @@ using System.Security.Claims;
 
 namespace ProductDemo.IntegrationTests.Services
 {
-    public class AuthTokenServiceTests
+    public class AuthTokenServiceTests : IClassFixture<CustomWebApplicationFactory<Program>>
     {
         private readonly IConfiguration _config;
         private readonly AppDbContext _context;
 
-        public AuthTokenServiceTests()
+        public AuthTokenServiceTests(CustomWebApplicationFactory<Program> factory)
         {
-            // Fake config with a long-enough key (>= 32 chars for HS256)
-            var inMemorySettings = new Dictionary<string, string>
-            {
-                { "Jwt:Key", "this_is_a_really_long_fake_test_key_1234567890!@#$" },
-                { "Jwt:Issuer", "test_issuer" },
-                { "Jwt:Audience", "test_audience" }
-            };
+            using var scope = factory.Services.CreateScope();
+            _config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
-            _config = new ConfigurationBuilder()
-                .AddInMemoryCollection(inMemorySettings!)
-                .Build();
-
-            // Fake DB with EF Core InMemory provider
             var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(databaseName: "AuthTokenTestDb")
+                .UseInMemoryDatabase("AuthTokenTestDb")
                 .Options;
 
             _context = new AppDbContext(options);
@@ -39,7 +30,6 @@ namespace ProductDemo.IntegrationTests.Services
         [Fact]
         public void CreateToken_ShouldInclude_UserId_Email_And_Roles()
         {
-            // Arrange
             var user = new AppUser
             {
                 Id = 1,
@@ -50,7 +40,6 @@ namespace ProductDemo.IntegrationTests.Services
 
             var role = new Role { Id = 1, Name = "Admin" };
             var userRole = new UserRole { UserId = 1, RoleId = 1, Role = role, User = user };
-
             user.UserRoles = new List<UserRole> { userRole };
 
             _context.Users.Add(user);
@@ -60,21 +49,15 @@ namespace ProductDemo.IntegrationTests.Services
 
             var service = new AuthTokenService(_config, _context);
 
-            // Act
             var token = service.CreateToken(user);
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
-            // Decode JWT
-            var handler = new JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(token);
-
-            // Assert - check claims
             jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "1");
             jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.Email && c.Value == "test@example.com");
             jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Admin");
 
-            // Assert - check issuer & audience
-            jwt.Issuer.Should().Be("test_issuer");
-            jwt.Audiences.Should().Contain("test_audience");
+            jwt.Issuer.Should().Be(_config["Jwt:Issuer"]);
+            jwt.Audiences.Should().Contain(_config["Jwt:Audience"]);
         }
     }
 }

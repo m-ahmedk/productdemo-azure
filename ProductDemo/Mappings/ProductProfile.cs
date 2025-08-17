@@ -2,27 +2,25 @@
 using ProductDemo.DTOs.Product;
 using ProductDemo.Models;
 
-namespace ProductDemo.Mappings
+public class ProductProfile : Profile
 {
-    public class ProductProfile : Profile
+    public ProductProfile()
     {
-        public ProductProfile()
-        {
-            // DTO to Entity 
-            CreateMap<CreateProductDto, Product>();
+        // Entity -> DTO
+        CreateMap<Product, ProductDto>();
 
-            // To update non null fields only
-            CreateMap<UpdateProductDto, Product>()
-            .ForMember(dest => dest.Price, opt =>
-                opt.Condition((src, dest, srcMember) => src.Price.HasValue))
-            .ForMember(dest => dest.Quantity, opt =>
-                opt.Condition((src, dest, srcMember) => src.Quantity.HasValue))
-            .ForMember(dest => dest.Name, opt =>
-                opt.Condition((src, dest, srcMember) => !string.IsNullOrWhiteSpace(src.Name)));
+        // Create DTO -> Entity (ignore Id, DB generates it)
+        CreateMap<CreateProductDto, Product>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore());
 
-            // Entity to DTO
-            CreateMap<Product, BaseProductDto>();
-            CreateMap<Product, ProductDto>();
-        }
+        // Update DTO -> Entity (only map non-null values)
+        CreateMap<UpdateProductDto, Product>()
+        .ForMember(dest => dest.Price, opt =>
+            opt.Condition(src => src.Price.HasValue))
+        .ForMember(dest => dest.Quantity, opt =>
+            opt.Condition(src => src.Quantity.HasValue))
+        .ForMember(dest => dest.Name, opt =>
+            opt.Condition(src => !string.IsNullOrWhiteSpace(src.Name)));
+
     }
 }

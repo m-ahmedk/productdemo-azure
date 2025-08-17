@@ -37,9 +37,6 @@ namespace ProductDemo.Tests.Helpers
         {
             InputSanitizer.Clean(null).Should().BeNull();
             InputSanitizer.Clean("   ").Should().Be("   "); // whitespace stays null? let's check
-
-            // careful: in your implementation, whitespace → returns original
-            // if you wanted it to return null, adjust implementation.
         }
     }
 }

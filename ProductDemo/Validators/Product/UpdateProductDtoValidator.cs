@@ -1,14 +1,26 @@
-﻿using FluentValidation;
+﻿// Validators/Product/UpdateProductDtoValidator.cs
+using FluentValidation;
 using ProductDemo.DTOs.Product;
 
-namespace ProductDemo.Validators.Product
+public class UpdateProductDtoValidator : AbstractValidator<UpdateProductDto>
 {
-    public class UpdateProductDtoValidator : ProductDtoValidatorBase<UpdateProductDto>
+    public UpdateProductDtoValidator()
     {
-        public UpdateProductDtoValidator() {
-            RuleFor(p => p.Id)
-                .GreaterThan(0)
-                .WithMessage("Product Id must be greater than 0");
-        }
+        RuleFor(x => x.Id).GreaterThan(0);
+
+        When(x => x.Name != null, () =>
+        {
+            RuleFor(x => x.Name).NotEmpty().MinimumLength(2);
+        });
+
+        When(x => x.Price.HasValue, () =>
+        {
+            RuleFor(x => x.Price).GreaterThan(0);
+        });
+
+        When(x => x.Quantity.HasValue, () =>
+        {
+            RuleFor(x => x.Quantity).GreaterThan(0);
+        });
     }
 }

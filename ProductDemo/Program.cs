@@ -17,10 +17,14 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Register DB Context
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer($"{connectionString}"));
+// Register DB Context, avoid DefaultConnection for Test
+if (!builder.Environment.IsEnvironment("Test"))
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer($"{connectionString}"));
+}
 
 // Register Model Binders, Swagger Services, Repositories, Services, Validators and Mappings via custom made Service Extension
 builder.Services.AddCustomBinders();
@@ -59,3 +63,6 @@ app.MapControllers();
 await DbInitializer.Seed(app.Services);
 
 app.Run();
+
+// make Program public/accessible, for integration test project
+public partial class Program { }

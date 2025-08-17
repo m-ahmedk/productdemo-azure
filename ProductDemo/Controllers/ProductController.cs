@@ -5,12 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 using ProductDemo.DTOs.Product;
 using ProductDemo.Helpers;
 using ProductDemo.Models;
-using ProductDemo.Services.Interfaces;
 
 namespace ProductDemo.Controllers;
 
-//[Authorize(Roles = "Admin")]
-[AllowAnonymous] // for on-going development
+[Authorize(Roles = "Admin")]
+//[AllowAnonymous] // for on-going development
 [ApiController]
 [Route("api/[controller]")]
 public class ProductController : ControllerBase

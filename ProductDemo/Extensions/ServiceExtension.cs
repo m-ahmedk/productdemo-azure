@@ -168,7 +168,7 @@ namespace ProductDemo.Extensions
                 cfg.AddGlobalIgnore("LastModifiedAt");
                 cfg.AddGlobalIgnore("IsDeleted");
                 cfg.AddGlobalIgnore("DeletedAt");
-                cfg.AddGlobalIgnore("Id");
+                // cfg.AddGlobalIgnore("Id");
 
             }, Assembly.GetExecutingAssembly());
 
