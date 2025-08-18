@@ -29,9 +29,6 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
-        var fail = await ValidationHelper.ValidateAndFormatAsync(_registerValidator, dto);
-        if (fail != null) return fail;
-
         var user = await _auth.RegisterAsync(dto);
 
         var result = new
@@ -46,9 +43,6 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
-        var fail = await ValidationHelper.ValidateAndFormatAsync(_loginValidator, dto);
-        if (fail != null) return fail;
-
         var token = await _auth.LoginAsync(dto);
 
         return Ok(ApiResponse<string>.SuccessResponse(token, "Login successful"));

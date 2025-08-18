@@ -17,21 +17,12 @@ public class ProductController : ControllerBase
     private readonly IProductService _productService;
     private readonly ILogger<ProductController> _logger;
     private readonly IMapper _mapper;
-    private readonly IValidator<CreateProductDto> _createValidator;
-    private readonly IValidator<UpdateProductDto> _updateValidator;
 
-    public ProductController(
-        IProductService productService,
-        ILogger<ProductController> logger,
-        IMapper mapper,
-        IValidator<CreateProductDto> createValidator,
-        IValidator<UpdateProductDto> updateValidator)
+    public ProductController(IProductService productService, ILogger<ProductController> logger, IMapper mapper)
     {
         _productService = productService;
         _logger = logger;
         _mapper = mapper;
-        _createValidator = createValidator;
-        _updateValidator = updateValidator;
     }
 
     [HttpGet]
@@ -61,9 +52,6 @@ public class ProductController : ControllerBase
     {
         _logger.LogInformation("POST create product called with name: {ProductName}", dto.Name);
 
-        var fail = await ValidationHelper.ValidateAndFormatAsync(_createValidator, dto);
-        if (fail != null) return fail;
-
         var product = _mapper.Map<Product>(dto);
         var created = await _productService.AddAsync(product);
         var productDto = _mapper.Map<ProductDto>(created);
@@ -76,9 +64,6 @@ public class ProductController : ControllerBase
     public async Task<IActionResult> Update(UpdateProductDto dto)
     {
         _logger.LogInformation("PATCH update product called with ID: {ProductId}", dto.Id);
-
-        var fail = await ValidationHelper.ValidateAndFormatAsync(_updateValidator, dto);
-        if (fail != null) return fail;
 
         var product = await _productService.GetByIdAsync(dto.Id); // Throws if not found
         _mapper.Map(dto, product);

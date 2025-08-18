@@ -10,10 +10,5 @@
             StatusCode = statusCode;
         }
 
-        public AppException(List<string> errors, string message = "Validation failed", int statusCode = 400) : base(message)
-        {
-            StatusCode = statusCode;
-            Errors = errors;
-        }
     }
 }

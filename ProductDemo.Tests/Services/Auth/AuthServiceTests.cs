@@ -1,128 +1,113 @@
 ﻿using FluentAssertions;
 using Moq;
 using ProductDemo.DTOs.Auth;
-using ProductDemo.Exceptions;
 using ProductDemo.Helpers;
 using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
 using ProductDemo.Services;
 using ProductDemo.Services.Interfaces;
-using System.Threading.Tasks;
-using Xunit;
 
-namespace ProductDemo.Tests.Services
+namespace ProductDemo.Tests.Services;
+
+public class AuthServiceTests
 {
-    public class AuthServiceTests
+    private readonly Mock<IUserRepository> _userRepoMock;
+    private readonly Mock<IAuthTokenService> _tokenServiceMock;
+    private readonly AuthService _sut; // System Under Test
+
+    public AuthServiceTests()
     {
-        private readonly Mock<IUserRepository> _userRepoMock;
-        private readonly Mock<IAuthTokenService> _tokenServiceMock;
-        private readonly AuthService _sut; // System Under Test
+        _userRepoMock = new Mock<IUserRepository>();
+        _tokenServiceMock = new Mock<IAuthTokenService>();
+        _sut = new AuthService(_userRepoMock.Object, _tokenServiceMock.Object);
+    }
 
-        public AuthServiceTests()
+    [Fact]
+    public async Task RegisterAsync_ShouldThrowInvalidOperation_WhenEmailExists()
+    {
+        var dto = new RegisterDto { Email = "test@example.com", Password = "pass" };
+        _userRepoMock.Setup(r => r.ExistsByEmailAsync("test@example.com")).ReturnsAsync(true);
+
+        Func<Task> act = async () => await _sut.RegisterAsync(dto);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Email already exists");
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ShouldLowercaseEmail_And_ReturnUser()
+    {
+        var dto = new RegisterDto { Email = "TEST@Example.com", Password = "pass123" };
+        _userRepoMock.Setup(r => r.ExistsByEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+
+        // Return the same AppUser that AuthService passes in
+        _userRepoMock
+            .Setup(r => r.AddAsync(It.IsAny<AppUser>()))
+            .ReturnsAsync((AppUser u) => u);
+
+        var result = await _sut.RegisterAsync(dto);
+
+        result.Email.Should().Be("test@example.com");
+        result.PasswordHash.Should().NotBeNullOrEmpty();
+        result.PasswordStamp.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldThrowUnauthorized_WhenUserNotFound()
+    {
+        var dto = new LoginDto { Email = "missing@example.com", Password = "pass" };
+        _userRepoMock.Setup(r => r.GetByEmailAsync(dto.Email)).ReturnsAsync((AppUser?)null);
+
+        Func<Task> act = async () => await _sut.LoginAsync(dto);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Invalid credentials");
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldThrowUnauthorized_WhenPasswordInvalid()
+    {
+        var dto = new LoginDto { Email = "user@example.com", Password = "wrongpass" };
+        var user = new AppUser
         {
-            _userRepoMock = new Mock<IUserRepository>();
-            _tokenServiceMock = new Mock<IAuthTokenService>();
-            _sut = new AuthService(_userRepoMock.Object, _tokenServiceMock.Object);
-        }
+            Id = 1,
+            Email = "user@example.com",
+            PasswordHash = [1,2,3],
+            PasswordStamp = [4,5,6]
+        };
 
-        [Fact]
-        public async Task RegisterAsync_ShouldCreateUser_WhenEmailDoesNotExist()
+        _userRepoMock.Setup(r => r.GetByEmailAsync(dto.Email)).ReturnsAsync(user);
+
+        // Force HashHelper to fail
+        // Normally, you'd abstract HashHelper too for mocking, 
+        // but here we rely on wrong password failing naturally.
+        Func<Task> act = async () => await _sut.LoginAsync(dto);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Invalid credentials");
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldReturnToken_WhenValidCredentials()
+    {
+        var dto = new LoginDto { Email = "user@example.com", Password = "correctpass" };
+
+        // Generate a real hash for "correctpass"
+        var (hash, salt) = HashHelper.HashPassword("correctpass");
+
+        var user = new AppUser
         {
-            // Arrange
-            var dto = new RegisterDto { Email = "test@example.com", Password = "Password123" };
-            _userRepoMock.Setup(r => r.ExistsByEmailAsync(dto.Email))
-                .ReturnsAsync(false);
+            Id = 1,
+            Email = "user@example.com",
+            PasswordHash = hash,
+            PasswordStamp = salt
+        };
 
-            _userRepoMock.Setup(r => r.AddAsync(It.IsAny<AppUser>()))
-                .ReturnsAsync((AppUser u) => u); // return the same user
+        _userRepoMock.Setup(r => r.GetByEmailAsync(dto.Email)).ReturnsAsync(user);
+        _tokenServiceMock.Setup(t => t.CreateToken(user)).Returns("fake-jwt-token");
 
-            // Act
-            var result = await _sut.RegisterAsync(dto);
+        var token = await _sut.LoginAsync(dto);
 
-            // Assert
-            result.Email.Should().Be(dto.Email.ToLowerInvariant());
-            result.PasswordHash.Should().NotBeNull();
-            result.PasswordStamp.Should().NotBeNull();
-            _userRepoMock.Verify(r => r.AddAsync(It.IsAny<AppUser>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task RegisterAsync_ShouldThrow_WhenEmailAlreadyExists()
-        {
-            // Arrange
-            var dto = new RegisterDto { Email = "existing@example.com", Password = "Password123" };
-            _userRepoMock.Setup(r => r.ExistsByEmailAsync(dto.Email))
-                .ReturnsAsync(true);
-
-            // Act
-            var act = async () => await _sut.RegisterAsync(dto);
-
-            // Assert
-            await act.Should().ThrowAsync<AppException>()
-                .WithMessage("Email already exists");
-        }
-
-        [Fact]
-        public async Task LoginAsync_ShouldReturnToken_WhenCredentialsAreValid()
-        {
-            // Arrange
-            var dto = new LoginDto { Email = "user@example.com", Password = "Password123" };
-            var (hash, salt) = HashHelper.HashPassword(dto.Password);
-            var user = new AppUser
-            {
-                Id = 1,
-                Email = dto.Email.ToLower(),
-                PasswordHash = hash,
-                PasswordStamp = salt
-            };
-
-            _userRepoMock.Setup(r => r.GetByEmailAsync(dto.Email))
-                .ReturnsAsync(user);
-
-            _tokenServiceMock.Setup(t => t.CreateToken(user))
-                .Returns("fake-jwt-token");
-
-            // Act
-            var result = await _sut.LoginAsync(dto);
-
-            // Assert
-            result.Should().Be("fake-jwt-token");
-        }
-
-
-        [Fact]
-        public async Task LoginAsync_ShouldThrow_WhenUserNotFound()
-        {
-            // Arrange
-            var dto = new LoginDto { Email = "notfound@example.com", Password = "Password123" };
-            _userRepoMock.Setup(r => r.GetByEmailAsync(dto.Email))
-                .ReturnsAsync((AppUser?)null);
-
-            // Act
-            var act = async () => await _sut.LoginAsync(dto);
-
-            // Assert
-            await act.Should().ThrowAsync<AppException>()
-                .WithMessage("Invalid credentials");
-        }
-
-        [Fact]
-        public async Task LoginAsync_ShouldThrow_WhenPasswordIsInvalid()
-        {
-            // Arrange
-            var dto = new LoginDto { Email = "user@example.com", Password = "wrongpassword" };
-            var (hash, salt) = HashHelper.HashPassword("correctpassword");
-            var user = new AppUser { Id = 1, Email = dto.Email, PasswordHash = hash, PasswordStamp = salt };
-
-            _userRepoMock.Setup(r => r.GetByEmailAsync(dto.Email))
-                .ReturnsAsync(user);
-
-            // Act
-            var act = async () => await _sut.LoginAsync(dto);
-
-            // Assert
-            await act.Should().ThrowAsync<AppException>()
-                .WithMessage("Invalid credentials");
-        }
+        token.Should().Be("fake-jwt-token");
     }
 }

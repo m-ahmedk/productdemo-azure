@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using ProductDemo.Data;
 using ProductDemo.Extensions;
 using ProductDemo.Logging;
-using ProductDemo.Middlewares;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,7 +34,8 @@ builder.Services.AddProjectRepositories();
 builder.Services.AddProjectServices();
 builder.Services.AddProjectValidators();
 builder.Services.AddProjectMappings();
-
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>(); // use my custom IExceptionHandler
+builder.Services.AddProblemDetails(); // registers ProblemDetails (RFC 7807) formatting support
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -44,8 +44,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// Add your custom middleware early in the pipeline
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+// Standard exception handler
+app.UseExceptionHandler(); // Hooks the exception handling middleware
 
 // Use Swagger middleware here, can be inside IsDevelopment if only for Development
 app.UseSwagger();

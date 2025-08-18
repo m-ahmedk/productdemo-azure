@@ -59,27 +59,6 @@ namespace ProductDemo.Extensions
                             Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!)
                         )
                     };
-
-                    options.Events = new JwtBearerEvents
-                    {
-                        // handle unauthorized with error message
-                        OnChallenge = context =>
-                        {
-                            context.HandleResponse(); // prevents ASP.NET default 401 write
-
-                            context.Response.StatusCode = 401;
-                            context.Response.ContentType = "application/json";
-                            var result = JsonSerializer.Serialize(ApiResponse<string>.FailResponse("Authentication failed."));
-                            return context.Response.WriteAsync(result);
-                        },
-                        OnForbidden = context =>
-                        {
-                            context.Response.StatusCode = 403;
-                            context.Response.ContentType = "application/json";
-                            var result = JsonSerializer.Serialize(ApiResponse<string>.FailResponse("You are not authorized to access this resource"));
-                            return context.Response.WriteAsync(result);
-                        }
-                    };
                 });
 
             services.AddAuthorization(); //  DI registration
@@ -145,10 +124,6 @@ namespace ProductDemo.Extensions
         public static IServiceCollection AddProjectValidators(this IServiceCollection services)
         {
             services.AddFluentValidationAutoValidation();
-            services.Configure<ApiBehaviorOptions>(options =>
-            {
-                options.SuppressModelStateInvalidFilter = true; // turn off auto-validation, manual validation preferred
-            });
             services.AddValidatorsFromAssemblyContaining<RegisterDtoValidator>(); // registers all validators
             //services.AddScoped<IValidator<CreateProductDto>, CreateProductDtoValidator>();
             //services.AddScoped<IValidator<UpdateProductDto>, UpdateProductDtoValidator>();
@@ -168,8 +143,6 @@ namespace ProductDemo.Extensions
                 cfg.AddGlobalIgnore("LastModifiedAt");
                 cfg.AddGlobalIgnore("IsDeleted");
                 cfg.AddGlobalIgnore("DeletedAt");
-                // cfg.AddGlobalIgnore("Id");
-
             }, Assembly.GetExecutingAssembly());
 
             services.AddAutoMapper(Assembly.GetExecutingAssembly());

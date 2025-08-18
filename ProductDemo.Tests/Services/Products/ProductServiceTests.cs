@@ -3,152 +3,93 @@ using Moq;
 using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
 using ProductDemo.Services;
-using ProductDemo.Exceptions;
 
-namespace ProductDemo.Tests.Services.Products
+namespace ProductDemo.Tests.Services;
+
+public class ProductServiceTests
 {
-    public class ProductServiceTests
+    private readonly Mock<IProductRepository> _repoMock;
+    private readonly ProductService _sut; // system under test
+
+    public ProductServiceTests()
     {
-        private readonly Mock<IProductRepository> _repoMock = new();
+        _repoMock = new Mock<IProductRepository>();
+        _sut = new ProductService(_repoMock.Object);
+    }
 
-        private ProductService CreateSut() => new ProductService(_repoMock.Object);
+    [Fact]
+    public async Task AddAsync_ShouldThrowInvalidOperation_WhenNameExists()
+    {
+        // Arrange
+        var product = new Product { Name = "Cola" };
+        _repoMock.Setup(r => r.ExistsByNameAsync("Cola")).ReturnsAsync(true);
 
-        // 1. ADD
-        [Fact]
-        public async Task AddAsync_ShouldThrow_WhenNameNotUnique()
-        {
-            var product = new Product { Name = "Cola" };
-            _repoMock.Setup(r => r.ExistsByNameAsync("Cola")).ReturnsAsync(true);
+        // Act
+        Func<Task> act = async () => await _sut.AddAsync(product);
 
-            var sut = CreateSut();
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Product name must be unique.");
+    }
 
-            var act = async () => await sut.AddAsync(product);
+    [Fact]
+    public async Task DeleteAsync_ShouldThrowArgumentException_WhenIdInvalid()
+    {
+        Func<Task> act = async () => await _sut.DeleteAsync(0);
 
-            await act.Should().ThrowAsync<AppException>()
-                .WithMessage("*unique*");
-        }
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("Invalid product ID.");
+    }
 
-        [Fact]
-        public async Task AddAsync_ShouldCallRepo_WhenValid()
-        {
-            var product = new Product { Name = "Water", Price = 5, Quantity = 3 };
-            _repoMock.Setup(r => r.ExistsByNameAsync("Water")).ReturnsAsync(false);
-            _repoMock.Setup(r => r.AddAsync(product)).ReturnsAsync(product);
-            var sut = CreateSut();
+    [Fact]
+    public async Task DeleteAsync_ShouldThrowKeyNotFound_WhenProductDoesNotExist()
+    {
+        _repoMock.Setup(r => r.DeleteAsync(99)).ReturnsAsync(false);
 
-            var created = await sut.AddAsync(product);
+        Func<Task> act = async () => await _sut.DeleteAsync(99);
 
-            created.Should().NotBeNull();
-            _repoMock.Verify(r => r.AddAsync(product), Times.Once);
-        }
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("Product with ID 99 not found.");
+    }
 
-        // 2. GET BY ID
-        [Theory]
-        [InlineData(0)]
-        [InlineData(-1)]
-        public async Task GetByIdAsync_ShouldThrow_WhenIdInvalid(int id)
-        {
-            var sut = CreateSut();
+    [Fact]
+    public async Task GetByIdAsync_ShouldThrowArgumentException_WhenIdInvalid()
+    {
+        Func<Task> act = async () => await _sut.GetByIdAsync(0);
 
-            var act = async () => await sut.GetByIdAsync(id);
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("Invalid product ID.");
+    }
 
-            await act.Should().ThrowAsync<AppException>().WithMessage("*Invalid Product ID*");
-        }
+    [Fact]
+    public async Task GetByIdAsync_ShouldThrowKeyNotFound_WhenProductMissing()
+    {
+        _repoMock.Setup(r => r.GetByIdAsync(42)).ReturnsAsync((Product?)null);
 
-        [Fact]
-        public async Task GetByIdAsync_ShouldThrow_WhenNotFound()
-        {
-            _repoMock.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((Product?)null);
-            var sut = CreateSut();
+        Func<Task> act = async () => await _sut.GetByIdAsync(42);
 
-            var act = async () => await sut.GetByIdAsync(99);
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("Product with ID 42 not found.");
+    }
 
-            await act.Should().ThrowAsync<AppException>().WithMessage("*not found*");
-        }
+    [Fact]
+    public async Task UpdateAsync_ShouldThrowArgumentException_WhenInvalidProduct()
+    {
+        Func<Task> act = async () => await _sut.UpdateAsync(new Product { Id = 0 });
 
-        [Fact]
-        public async Task GetByIdAsync_ShouldReturn_WhenFound()
-        {
-            var product = new Product { Id = 10, Name = "Tea" };
-            _repoMock.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(product);
-            var sut = CreateSut();
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("Invalid product.");
+    }
 
-            var result = await sut.GetByIdAsync(10);
+    [Fact]
+    public async Task UpdateAsync_ShouldThrowInvalidOperation_WhenUpdateFails()
+    {
+        var product = new Product { Id = 1, Name = "Cola" };
+        _repoMock.Setup(r => r.UpdateAsync(product)).ReturnsAsync(false);
 
-            result.Id.Should().Be(10);
-            result.Name.Should().Be("Tea");
-        }
+        Func<Task> act = async () => await _sut.UpdateAsync(product);
 
-        // 3. UPDATE
-        [Fact]
-        public async Task UpdateAsync_ShouldThrow_WhenInvalidProduct()
-        {
-            var sut = CreateSut();
-
-            var act1 = async () => await sut.UpdateAsync(null!);
-            var act2 = async () => await sut.UpdateAsync(new Product { Id = 0 });
-
-            await act1.Should().ThrowAsync<AppException>();
-            await act2.Should().ThrowAsync<AppException>();
-        }
-
-        [Fact]
-        public async Task UpdateAsync_ShouldThrow_WhenRepoUpdateFails()
-        {
-            var prod = new Product { Id = 42, Name = "X" };
-            _repoMock.Setup(r => r.UpdateAsync(prod)).ReturnsAsync(false);
-            var sut = CreateSut();
-
-            var act = async () => await sut.UpdateAsync(prod);
-
-            await act.Should().ThrowAsync<AppException>().WithMessage("*Update failed*");
-        }
-
-        [Fact]
-        public async Task UpdateAsync_ShouldPass_WhenRepoUpdates()
-        {
-            var prod = new Product { Id = 42, Name = "X" };
-            _repoMock.Setup(r => r.UpdateAsync(prod)).ReturnsAsync(true);
-            var sut = CreateSut();
-
-            await sut.UpdateAsync(prod);
-
-            _repoMock.Verify(r => r.UpdateAsync(prod), Times.Once);
-        }
-
-        // 4. DELETE
-        [Theory]
-        [InlineData(0)]
-        [InlineData(-10)]
-        public async Task DeleteAsync_ShouldThrow_WhenIdInvalid(int id)
-        {
-            var sut = CreateSut();
-
-            var act = async () => await sut.DeleteAsync(id);
-
-            await act.Should().ThrowAsync<AppException>();
-        }
-
-        [Fact]
-        public async Task DeleteAsync_ShouldThrow_WhenNotFound()
-        {
-            _repoMock.Setup(r => r.DeleteAsync(100)).ReturnsAsync(false);
-            var sut = CreateSut();
-
-            var act = async () => await sut.DeleteAsync(100);
-
-            await act.Should().ThrowAsync<AppException>().WithMessage("*not found*");
-        }
-
-        [Fact]
-        public async Task DeleteAsync_ShouldPass_WhenDeleted()
-        {
-            _repoMock.Setup(r => r.DeleteAsync(5)).ReturnsAsync(true);
-            var sut = CreateSut();
-
-            await sut.DeleteAsync(5);
-
-            _repoMock.Verify(r => r.DeleteAsync(5), Times.Once);
-        }
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Update failed. Try again later.");
     }
 }

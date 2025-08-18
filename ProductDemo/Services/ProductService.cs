@@ -1,6 +1,5 @@
 ﻿using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
-using ProductDemo.Exceptions;
 
 namespace ProductDemo.Services;
 
@@ -16,8 +15,9 @@ public class ProductService : IProductService
     public async Task<Product> AddAsync(Product product)
     {
         var exists = await _repository.ExistsByNameAsync(product.Name);
+
         if (exists)
-            throw new AppException("Product name must be unique");
+            throw new InvalidOperationException("Product name must be unique.");
 
         await _repository.AddAsync(product);
         return product;
@@ -26,11 +26,12 @@ public class ProductService : IProductService
     public async Task DeleteAsync(int id)
     {
         if (id <= 0)
-            throw new AppException("Invalid Product ID");
+            throw new ArgumentException("Invalid product ID.");
 
         var deleted = await _repository.DeleteAsync(id);
+
         if (!deleted)
-            throw new AppException($"Product with ID {id} not found");
+            throw new KeyNotFoundException($"Product with ID {id} not found.");
     }
 
     public async Task<IEnumerable<Product>> GetAllAsync()
@@ -41,11 +42,12 @@ public class ProductService : IProductService
     public async Task<Product> GetByIdAsync(int id)
     {
         if (id <= 0)
-            throw new AppException("Invalid Product ID");
+            throw new ArgumentException("Invalid product ID.");
 
         var product = await _repository.GetByIdAsync(id);
+        
         if (product == null)
-            throw new AppException($"Product with ID {id} not found");
+            throw new KeyNotFoundException($"Product with ID {id} not found.");
 
         return product;
     }
@@ -53,10 +55,11 @@ public class ProductService : IProductService
     public async Task UpdateAsync(Product product)
     {
         if (product == null || product.Id <= 0)
-            throw new AppException("Invalid product");
+            throw new ArgumentException("Invalid product.");
 
         var updated = await _repository.UpdateAsync(product);
+     
         if (!updated)
-            throw new AppException("Update failed. Try again later.");
+            throw new InvalidOperationException("Update failed. Try again later.");
     }
 }
