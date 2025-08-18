@@ -23,6 +23,7 @@ public class GlobalExceptionHandler : IExceptionHandler
 
         problemDetails.Status = exception switch
         {
+            UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
             ArgumentException => StatusCodes.Status400BadRequest,
             KeyNotFoundException => StatusCodes.Status404NotFound,
             InvalidOperationException => StatusCodes.Status409Conflict,

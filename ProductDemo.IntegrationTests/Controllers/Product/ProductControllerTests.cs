@@ -97,6 +97,6 @@ public class ProductControllerTests : TestBase
 
         // Verify it’s gone
         var getResponse = await Client.GetAsync($"/api/product/{productId}");
-        getResponse.StatusCode.Should().Be(HttpStatusCode.InternalServerError); // since your service throws when not found
+        getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }
