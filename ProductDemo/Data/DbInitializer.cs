@@ -33,24 +33,48 @@ namespace ProductDemo.Data
         {
             if (!context.Users.Any())
             {
-                var (hash, salt) = HashHelper.HashPassword("ahmed123#");
+                // ---- Admin user ----
+                var (adminHash, adminSalt) = HashHelper.HashPassword("ahmed123#");
 
-                var user = new AppUser {
+                var adminUser = new AppUser
+                {
                     Email = "mahmedvilla@gmail.com",
-                    PasswordHash = hash,
-                    PasswordStamp = salt,
+                    PasswordHash = adminHash,
+                    PasswordStamp = adminSalt,
                     UserRoles = new List<UserRole>()
                 };
 
-                // Assign role to user
                 Role? adminRole = context.Roles.FirstOrDefault(x => x.Name == "Admin");
-                if (adminRole != null) {
-                    user.UserRoles.Add(new UserRole { Role = adminRole });
+                if (adminRole != null)
+                {
+                    adminUser.UserRoles.Add(new UserRole { Role = adminRole });
                 }
 
-                await context.Users.AddAsync(user);
+                await context.Users.AddAsync(adminUser);
+
+                // ---- Normal user ----
+                var (userHash, userSalt) = HashHelper.HashPassword("user123#");
+
+                var normalUser = new AppUser
+                {
+                    Email = "normaluser@test.com",
+                    PasswordHash = userHash,
+                    PasswordStamp = userSalt,
+                    UserRoles = new List<UserRole>()
+                };
+
+                Role? userRole = context.Roles.FirstOrDefault(x => x.Name == "User");
+                if (userRole != null)
+                {
+                    normalUser.UserRoles.Add(new UserRole { Role = userRole });
+                }
+
+                await context.Users.AddAsync(normalUser);
+
+                // Save both users
                 await context.SaveChangesAsync();
             }
         }
+
     }
 }
