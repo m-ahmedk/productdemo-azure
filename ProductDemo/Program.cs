@@ -6,26 +6,33 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Config: appsettings -> user secrets (dev) -> env vars
+builder.Configuration
+       .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+       .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables();  // load env first
+
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>();
+}
+
+// Logging
 LogConfigurator.ConfigureLogging(builder.Configuration);
 builder.Host.UseSerilog();
 
-// Add services to the container.
-
+// Services
 builder.Services.AddControllers();
-
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Register DB Context, avoid DefaultConnection for Test
 if (!builder.Environment.IsEnvironment("Test"))
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlServer($"{connectionString}"));
+        options.UseSqlServer(connectionString));
 }
 
-// Register Model Binders, Swagger Services, Repositories, Services, Validators and Mappings via custom made Service Extension
 builder.Services.AddCustomBinders();
 builder.Services.AddCustomJsonConverters();
 builder.Services.AddSwaggerDocument();
@@ -34,35 +41,39 @@ builder.Services.AddProjectRepositories();
 builder.Services.AddProjectServices();
 builder.Services.AddProjectValidators();
 builder.Services.AddProjectMappings();
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>(); // use my custom IExceptionHandler
-builder.Services.AddProblemDetails(); // registers ProblemDetails (RFC 7807) formatting support
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-// Standard exception handler
-app.UseExceptionHandler(); // Hooks the exception handling middleware
-
-// Use Swagger middleware here, can be inside IsDevelopment if only for Development
+app.UseExceptionHandler();
 app.UseSwagger();
-app.UseSwaggerUI(); // This enables browser testing
-
+app.UseSwaggerUI();
 app.UseHttpsRedirection();
-
-// request pipeline execution
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
+app.MapHealthChecks("/health");
 
-// seed data
+// Run migrations + seed, exclude test environment from this
+if (!app.Environment.IsEnvironment("Test"))
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+    }
+}
+
 await DbInitializer.Seed(app.Services);
 
 app.Run();
 
-// make Program public/accessible, for integration test project
 public partial class Program { }

@@ -1,0 +1,36 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest # Official Microsoft SQL Server 2022 image
+    container_name: product-sql # Defined container name (avoids random auto-generated)
+    environment:
+      # Environment variables required by Microsoft SQL Server container:
+      SA_PASSWORD: ${SA_PASSWORD} # Pulled from .env file
+      ACCEPT_EULA: "Y"            #  Required: must accept Microsoft's license to run the container
+    ports:
+      - "11433:1433"   #    Map container's SQL port (1433) to host 11433
+                       #    Local SQL Express is already using 1433.
+                       #    Will connect using: localhost,11433
+    volumes:
+      - sql_data:/var/opt/mssql   # Persist SQL Server database files so data survives restarts
+
+  productapi:
+    build:
+      context: .                  # Root of repo as Docker build context (so it sees .sln + all projects)
+      dockerfile: ProductDemo/Dockerfile # Explicitly point to API Dockerfile inside ProductDemo folder
+    container_name: product-api    # Fixed container name instead of random generated
+    ports:
+      - "5000:8080"                # Maps container's port 8080 -> localhost:5000 (API Swagger/UI lives here)
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development                     # Tells ASP.NET to run in "Development" mode
+      ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection} # Pulled from .env
+      Jwt__Key: ${Jwt__Key}         # Pulled from .env (ensures same JWT key inside/outside container)
+      Jwt__Issuer: ${Jwt__Issuer}   # Pulled from .env
+      Jwt__Audience: ${Jwt__Audience} # Pulled from .env
+    depends_on:
+      - sqlserver                  # Ensures SQL container starts before API tries to connect
+    volumes:
+      - ./ProductDemo/Logs:/app/Logs # Mounts local "Logs" folder into container's /app/Logs
+                                     # -> lets you persist logs outside container lifecycle
+
+volumes:
+  sql_data: # Named volume (managed by Docker). Lives outside container lifecycle.

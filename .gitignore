@@ -7,4 +7,3 @@
 *.db
 *.log
 .env
-appsettings.Development.json
