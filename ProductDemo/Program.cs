@@ -62,7 +62,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-// Run migrations + seed, exclude test environment from this
+// Run migrations + seed, and exclude test environment from this
 if (!app.Environment.IsEnvironment("Test"))
 {
     using (var scope = app.Services.CreateScope())
