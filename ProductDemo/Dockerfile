@@ -3,7 +3,8 @@
 # It only contains the ASP.NET Core runtime (no SDK/compilers).
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
-EXPOSE 8080   # Expose port 8080 inside container (mapped in docker-compose.yml)
+# Expose port 8080 inside container (mapped in docker-compose.yml)
+EXPOSE 8080
 
 # ---- Build image ----
 # This stage contains the full .NET SDK so it can restore/build/publish the project.
