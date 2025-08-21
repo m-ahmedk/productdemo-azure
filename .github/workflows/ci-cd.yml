@@ -1,14 +1,5 @@
-# -------------------------------
-# Name of the workflow (shows up in GitHub Actions tab)
-# -------------------------------
 name: CI/CD Pipeline
 
-# -------------------------------
-# When should this workflow run?
-# Here: 
-#   - whenever code is pushed to the "main" branch
-#   - whenever a pull request is made into "main"
-# -------------------------------
 on:
   push:
     branches:
@@ -20,62 +11,46 @@ on:
       - staging
       - main
 
-# -------------------------------
-# Jobs: defines what tasks will run in this workflow.
-# We call the job "build".
-# -------------------------------
 jobs:
   build:
-    # GitHub gives us a fresh VM to run the job on.
     runs-on: ubuntu-latest
 
-    # -------------------------------
-    # Steps inside this job
-    # Each step either uses an existing GitHub Action 
-    # or runs a command.
-    # -------------------------------
     steps:
-      # 1. Checkout repo code
-      # Without this, the VM would be empty.
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup .NET SDK (so "dotnet" commands can run inside the VM)
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'   # use latest .NET 9 SDK
+          dotnet-version: '9.0.x'
 
-      # 3. Restore NuGet dependencies
-      # (Downloads all the packages needed by your solution)
       - name: Restore dependencies
         run: dotnet restore
 
-      # 4. Build the project in Release mode
-      # This compiles your code
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      # 5. Run tests
-      # Executes your xUnit tests inside the pipeline
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
-      # 6. Login to DockerHub
-      # Uses your saved GitHub secrets (username + token)
+      # Login only for staging + main
       - name: Login to DockerHub
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 7. Build Docker image
-      # Uses your Dockerfile inside ProductDemo/
-      # Tags it as "username/product-api:latest"
-      - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest -f ProductDemo/Dockerfile .
+      # Build & push staging image
+      - name: Build & Push Staging Image
+        if: github.ref == 'refs/heads/staging'
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging -f ProductDemo/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
 
-      # 8. Push Docker image to DockerHub
-      # This uploads the image so you (or anyone) can pull it later
-      - name: Push Docker image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
+      # Build & push production image
+      - name: Build & Push Prod Image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest -f ProductDemo/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
