@@ -11,9 +11,14 @@ name: CI/CD Pipeline
 # -------------------------------
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+      - staging
+      - 'feature/*'
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - staging
+      - main
 
 # -------------------------------
 # Jobs: defines what tasks will run in this workflow.
