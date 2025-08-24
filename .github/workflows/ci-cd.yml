@@ -4,67 +4,50 @@
 # ---------------------------------------------------
 name: CI/CD Pipeline
 
-# ---------------------------------------------------
-# Trigger rules
-# ---------------------------------------------------
 on:
   push:
     branches:
-      - main         # Production → stable releases
-      - staging      # Pre-prod/QA → beta prereleases
-      - 'feature/*'  # Feature branches → alpha prereleases
-      - 'fix/*'      # Bugfix branches → alpha prereleases
-      - 'chore/*'    # Infra/config → alpha prereleases
-      - 'refactor/*' # Refactors → alpha prereleases
-      - 'docs/*'     # Docs → alpha prereleases
+      - main
+      - staging
+      - 'feature/*'
+      - 'fix/*'
+      - 'chore/*'
+      - 'refactor/*'
+      - 'docs/*'
   pull_request:
     branches:
       - staging
       - main
 
-# ---------------------------------------------------
-# Jobs
-# ---------------------------------------------------
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # ---------------------------------------------------
-      # Step 1: Checkout repo with full history and tags
-      # Required by GitVersion to walk history & tags
-      # ---------------------------------------------------
+      # Step 1: Checkout repo with full history
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          fetch-tags: true
 
-      # ---------------------------------------------------
-      # Step 2: Install GitVersion (latest stable v6.3.x)
-      # ---------------------------------------------------
+      # Step 2: Ensure tags are present
+      - name: Fetch tags
+        run: git fetch --tags --prune --progress
+
+      # Step 3: Install GitVersion
       - name: Install GitVersion
         uses: GitTools/actions/gitversion/setup@v4.1.0
         with:
           versionSpec: '6.3.x'
 
-      # ---------------------------------------------------
-      # Step 3: Run GitVersion with config file
-      # Will output variables like:
-      #   fullSemVer: 1.2.3-beta.1
-      #   semVer: 1.2.3-beta.1
-      #   nuGetVersionV2: 1.2.3-beta0001
-      #   assemblySemVer: 1.2.3.0
-      # ---------------------------------------------------
+      # Step 4: Run GitVersion
       - name: Determine Version
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
           configFilePath: GitVersion.yml
 
-      # ---------------------------------------------------
-      # Step 4: Display version outputs (debugging/logging)
-      # ---------------------------------------------------
+      # Step 5: Debug version outputs
       - name: Display GitVersion outputs
         run: |
           echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
@@ -72,36 +55,25 @@ jobs:
           echo "NuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
           echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
 
-      # ---------------------------------------------------
-      # Step 5: Setup .NET SDK (9.x)
-      # ---------------------------------------------------
+      # Step 6: Setup .NET
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # ---------------------------------------------------
-      # Step 6: Restore dependencies
-      # ---------------------------------------------------
+      # Step 7: Restore dependencies
       - name: Restore dependencies
         run: dotnet restore
 
-      # ---------------------------------------------------
-      # Step 7: Build in Release mode
-      # Injects GitVersion's semVer into assembly version
-      # ---------------------------------------------------
+      # Step 8: Build with version injected
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.semVer }}
 
-      # ---------------------------------------------------
-      # Step 8: Run tests (for all branches)
-      # ---------------------------------------------------
+      # Step 9: Run tests
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
-      # ---------------------------------------------------
-      # Step 9: Login to DockerHub (only staging/main)
-      # ---------------------------------------------------
+      # Step 10: Login to DockerHub (staging/main only)
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
         uses: docker/login-action@v3
@@ -109,38 +81,28 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ---------------------------------------------------
-      # Step 10: Build & Push STAGING image
-      # Uses SemVer + floating tag 'staging'
-      # ---------------------------------------------------
+      # Step 11: Build & Push staging image
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
         run: |
           VERSION=${{ steps.gitversion.outputs.semVer }}
           echo "Building staging version $VERSION"
-
           docker build \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging \
             -f ProductDemo/Dockerfile .
-
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
 
-      # ---------------------------------------------------
-      # Step 11: Build & Push PRODUCTION image
-      # Uses SemVer + floating tag 'latest'
-      # ---------------------------------------------------
+      # Step 12: Build & Push production image
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main'
         run: |
           VERSION=${{ steps.gitversion.outputs.semVer }}
           echo "Building production version $VERSION"
-
           docker build \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest \
             -f ProductDemo/Dockerfile .
-
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
