@@ -18,17 +18,16 @@ on:
       - 'docs/*'     # docs → alpha prereleases (build + test only)
   pull_request:
     branches:
-      - staging      # validate PRs into staging
-      - main         # validate PRs into main
+      - staging
+      - main
 
 jobs:
   build:
-    runs-on: ubuntu-latest   # GitHub provides a fresh Ubuntu VM for us
+    runs-on: ubuntu-latest
 
     steps:
       # -------------------------------
-      # Step 1: Checkout the repo code
-      # Use fetch-depth: 0 → required for GitVersion
+      # Step 1: Checkout full history (needed for GitVersion)
       # -------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,9 +35,7 @@ jobs:
           fetch-depth: 0
 
       # -------------------------------
-      # Step 2: Install GitVersion
-      # Wrapper version: v4.1.0 (latest)
-      # Tool version: 6.3.x (latest stable)
+      # Step 2: Install GitVersion (latest stable 6.3.x)
       # -------------------------------
       - name: Install GitVersion
         uses: GitTools/actions/gitversion/setup@v4.1.0
@@ -46,27 +43,31 @@ jobs:
           versionSpec: '6.3.x'
 
       # -------------------------------
-      # Step 3: Run GitVersion with config
-      # Uses GitVersion.yml in repo root
+      # Step 3: Run GitVersion with config file
+      # Exposes camelCase outputs (v6):
+      #   steps.gitversion.outputs.fullSemVer → 1.2.3-beta.1
+      #   steps.gitversion.outputs.semVer     → 1.2.3-beta.1
+      #   steps.gitversion.outputs.nuGetVersionV2 → 1.2.3-beta0001
       # -------------------------------
       - name: Determine Version
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
+          useConfigFile: true
           configFilePath: GitVersion.yml
 
       # -------------------------------
-      # Step 4: Show version in logs
-      # Makes it easy to confirm CI versioning
+      # Step 4: Display version info in logs (debugging)
       # -------------------------------
       - name: Display GitVersion outputs
         run: |
-          echo "fullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
-          echo "nuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
-          echo "assemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
+          echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
+          echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
+          echo "NuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
+          echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
 
       # -------------------------------
-      # Step 5: Setup .NET SDK
+      # Step 5: Setup .NET
       # -------------------------------
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -80,22 +81,19 @@ jobs:
         run: dotnet restore
 
       # -------------------------------
-      # Step 7: Build
-      # Pass GitVersion’s FullSemVer into /p:Version
+      # Step 7: Build with GitVersion output
       # -------------------------------
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.fullSemVer }}
+        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.semVer }}
 
       # -------------------------------
-      # Step 8: Run tests
-      # Runs for all branches
+      # Step 8: Run Tests
       # -------------------------------
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
       # -------------------------------
       # Step 9: Login to DockerHub
-      # Only runs for staging + main
       # -------------------------------
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
@@ -106,14 +104,11 @@ jobs:
 
       # -------------------------------
       # Step 10: Build & Push STAGING image
-      # Tags:
-      #   product-api:<FullSemVer> (e.g., 1.2.3-beta.1)
-      #   product-api:staging (floating QA tag)
       # -------------------------------
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
         run: |
-          VERSION=${{ steps.gitversion.outputs.fullSemVer }}
+          VERSION=${{ steps.gitversion.outputs.semVer }}
           echo "Building staging version $VERSION"
 
           docker build \
@@ -126,14 +121,11 @@ jobs:
 
       # -------------------------------
       # Step 11: Build & Push PRODUCTION image
-      # Tags:
-      #   product-api:<FullSemVer> (e.g., 1.2.3)
-      #   product-api:latest (floating stable tag)
       # -------------------------------
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main'
         run: |
-          VERSION=${{ steps.gitversion.outputs.fullSemVer }}
+          VERSION=${{ steps.gitversion.outputs.semVer }}
           echo "Building production version $VERSION"
 
           docker build \
