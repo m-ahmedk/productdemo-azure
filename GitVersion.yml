@@ -1,0 +1,86 @@
+# ---------------------------------------------------
+# GitVersion configuration (v6.x)
+# Production-ready, works with GitHub Actions
+# ---------------------------------------------------
+
+# Fallback starting version if no tags exist
+next-version: 0.1.0
+
+# Versioning mode:
+# - ContinuousDelivery → increments for each merge
+# - ContinuousDeployment → increments continuously on branch builds
+mode: ContinuousDelivery
+
+# Ensure strict SemVer format (no weird suffixes)
+semantic-version-format: Strict
+
+# Tag regex (v1.0.0 or 1.0.0 are both valid)
+tag-prefix: '[vV]?'
+
+# Assembly versioning schemes
+assembly-versioning-scheme: MajorMinorPatch
+assembly-file-versioning-scheme: MajorMinorPatch
+
+# Override version bumps with commit messages
+major-version-bump-message: '\+semver:\s?(breaking|major)'
+minor-version-bump-message: '\+semver:\s?(feature|minor)'
+patch-version-bump-message: '\+semver:\s?(fix|patch)'
+no-bump-message: '\+semver:\s?(none|skip)'
+
+# ---------------------------------------------------
+# Branch configuration
+# ---------------------------------------------------
+branches:
+  main:
+    regex: ^main$
+    increment: Patch
+    label: ''
+    mode: ContinuousDelivery
+
+  staging:
+    regex: ^staging$
+    increment: Patch
+    label: beta
+    mode: ContinuousDeployment
+
+  feature:
+    regex: ^features?[/-]
+    increment: Minor
+    label: alpha
+    mode: ContinuousDeployment
+
+  fix:
+    regex: ^fix(es)?[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
+
+  hotfix:
+    regex: ^hotfix(es)?[/-]
+    increment: Patch
+    label: ''
+    mode: ContinuousDelivery
+
+  release:
+    regex: ^releases?[/-]
+    increment: Minor
+    label: rc
+    mode: ContinuousDelivery
+
+  chore:
+    regex: ^chore[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
+
+  refactor:
+    regex: ^refactor[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
+
+  docs:
+    regex: ^docs[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
