@@ -1,18 +1,12 @@
-# ===============================
-# GitVersion.yml (v6.x schema)
-# Industry best practice for GitHub Flow
-# ===============================
-
+# GitHub Flow based GitVersion config (v6.x) – Industry standard
 workflow: GitHubFlow/v1
 
-# Version formatting
 tag-prefix: '[vV]?'
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
 semantic-version-format: FullSemVer
 update-build-number: true
 
-# Commit message rules
 major-version-bump-message: '\+semver:\s?(breaking|major)'
 minor-version-bump-message: '\+semver:\s?(feature|minor)'
 patch-version-bump-message: '\+semver:\s?(fix|patch)'

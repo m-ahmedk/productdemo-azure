@@ -37,7 +37,7 @@ jobs:
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
-          configFilePath: GitVersion.yml   # ✅ only this, no useConfigFile
+          configFilePath: GitVersion.yml
 
       # 4. Show calculated version in logs
       - name: Display GitVersion outputs
