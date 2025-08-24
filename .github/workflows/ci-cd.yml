@@ -1,60 +1,70 @@
+# ---------------------------------------------------
+# CI/CD Pipeline for Product API
+# Uses GitVersion (6.3.x) for semantic versioning
+# ---------------------------------------------------
 name: CI/CD Pipeline
 
+# ---------------------------------------------------
+# Trigger rules
+# ---------------------------------------------------
 on:
   push:
     branches:
-      - main
-      - staging
-      - 'feature/*'
-      - 'fix/*'
-      - 'chore/*'
-      - 'refactor/*'
-      - 'docs/*'
+      - main         # Production → stable releases
+      - staging      # Pre-prod/QA → beta prereleases
+      - 'feature/*'  # Feature branches → alpha prereleases
+      - 'fix/*'      # Bugfix branches → alpha prereleases
+      - 'chore/*'    # Infra/config → alpha prereleases
+      - 'refactor/*' # Refactors → alpha prereleases
+      - 'docs/*'     # Docs → alpha prereleases
   pull_request:
     branches:
       - staging
       - main
 
+# ---------------------------------------------------
+# Jobs
+# ---------------------------------------------------
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------------
-      # Step 1: Checkout with full history
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 1: Checkout repo with full history and tags
+      # Required by GitVersion to walk history & tags
+      # ---------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
-      # -------------------------------
-      # Step 2: Ensure tags are available
-      # Required so GitVersion can find v0.1.0 baseline
-      # -------------------------------
-      - name: Fetch tags
-        run: git fetch --tags --prune --progress
-
-      # -------------------------------
-      # Step 3: Install GitVersion (latest stable v6.3.x)
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 2: Install GitVersion (latest stable v6.3.x)
+      # ---------------------------------------------------
       - name: Install GitVersion
         uses: GitTools/actions/gitversion/setup@v4.1.0
         with:
           versionSpec: '6.3.x'
 
-      # -------------------------------
-      # Step 4: Run GitVersion
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 3: Run GitVersion with config file
+      # Will output variables like:
+      #   fullSemVer: 1.2.3-beta.1
+      #   semVer: 1.2.3-beta.1
+      #   nuGetVersionV2: 1.2.3-beta0001
+      #   assemblySemVer: 1.2.3.0
+      # ---------------------------------------------------
       - name: Determine Version
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
           configFilePath: GitVersion.yml
 
-      # -------------------------------
-      # Step 5: Display GitVersion outputs
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 4: Display version outputs (debugging/logging)
+      # ---------------------------------------------------
       - name: Display GitVersion outputs
         run: |
           echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
@@ -62,47 +72,36 @@ jobs:
           echo "NuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
           echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
 
-      # -------------------------------
-      # Step 6: Setup .NET SDK
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 5: Setup .NET SDK (9.x)
+      # ---------------------------------------------------
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # -------------------------------
-      # Step 7: Cache NuGet packages
-      # -------------------------------
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      # -------------------------------
-      # Step 8: Restore dependencies
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 6: Restore dependencies
+      # ---------------------------------------------------
       - name: Restore dependencies
         run: dotnet restore
 
-      # -------------------------------
-      # Step 9: Build project
-      # Inject GitVersion fullSemVer into assemblies
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 7: Build in Release mode
+      # Injects GitVersion's semVer into assembly version
+      # ---------------------------------------------------
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.fullSemVer }}
+        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.semVer }}
 
-      # -------------------------------
-      # Step 10: Run tests
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 8: Run tests (for all branches)
+      # ---------------------------------------------------
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
-      # -------------------------------
-      # Step 11: Login to DockerHub (only staging/main)
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 9: Login to DockerHub (only staging/main)
+      # ---------------------------------------------------
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
         uses: docker/login-action@v3
@@ -110,41 +109,38 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # -------------------------------
-      # Step 12: Setup Docker Buildx (for caching)
-      # -------------------------------
-      - name: Setup Docker Buildx
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
-        uses: docker/setup-buildx-action@v3
-
-      # -------------------------------
-      # Step 13: Build & Push STAGING image
-      # -------------------------------
+      # ---------------------------------------------------
+      # Step 10: Build & Push STAGING image
+      # Uses SemVer + floating tag 'staging'
+      # ---------------------------------------------------
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          context: .
-          file: ProductDemo/Dockerfile
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/product-api:${{ steps.gitversion.outputs.semVer }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/product-api:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/product-api:buildcache,mode=max
+        run: |
+          VERSION=${{ steps.gitversion.outputs.semVer }}
+          echo "Building staging version $VERSION"
 
-      # -------------------------------
-      # Step 14: Build & Push PROD image
-      # -------------------------------
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging \
+            -f ProductDemo/Dockerfile .
+
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
+
+      # ---------------------------------------------------
+      # Step 11: Build & Push PRODUCTION image
+      # Uses SemVer + floating tag 'latest'
+      # ---------------------------------------------------
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          context: .
-          file: ProductDemo/Dockerfile
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/product-api:${{ steps.gitversion.outputs.semVer }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/product-api:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/product-api:buildcache,mode=max
+        run: |
+          VERSION=${{ steps.gitversion.outputs.semVer }}
+          echo "Building production version $VERSION"
+
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest \
+            -f ProductDemo/Dockerfile .
+
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
