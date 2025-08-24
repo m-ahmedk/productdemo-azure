@@ -1,146 +1,86 @@
 # ---------------------------------------------------
-# CI/CD Pipeline for Product API
-# Uses GitVersion (6.3.x) for semantic versioning
+# GitVersion configuration (v6.x)
+# Production-ready, works with GitHub Actions
 # ---------------------------------------------------
-name: CI/CD Pipeline
+
+# Fallback starting version if no tags exist
+next-version: 0.1.0
+
+# Versioning mode:
+# - ContinuousDelivery → increments for each merge
+# - ContinuousDeployment → increments continuously on branch builds
+mode: ContinuousDelivery
+
+# Ensure strict SemVer format (no weird suffixes)
+semantic-version-format: Strict
+
+# Tag regex (v1.0.0 or 1.0.0 are both valid)
+tag-prefix: '[vV]?'
+
+# Assembly versioning schemes
+assembly-versioning-scheme: MajorMinorPatch
+assembly-file-versioning-scheme: MajorMinorPatch
+
+# Override version bumps with commit messages
+major-version-bump-message: '\+semver:\s?(breaking|major)'
+minor-version-bump-message: '\+semver:\s?(feature|minor)'
+patch-version-bump-message: '\+semver:\s?(fix|patch)'
+no-bump-message: '\+semver:\s?(none|skip)'
 
 # ---------------------------------------------------
-# Trigger rules
+# Branch configuration
 # ---------------------------------------------------
-on:
-  push:
-    branches:
-      - main         # Production → stable releases
-      - staging      # Pre-prod/QA → beta prereleases
-      - 'feature/*'  # Feature branches → alpha prereleases
-      - 'fix/*'      # Bugfix branches → alpha prereleases
-      - 'chore/*'    # Infra/config → alpha prereleases
-      - 'refactor/*' # Refactors → alpha prereleases
-      - 'docs/*'     # Docs → alpha prereleases
-  pull_request:
-    branches:
-      - staging
-      - main
+branches:
+  main:
+    regex: ^main$
+    increment: Patch
+    label: ''
+    mode: ContinuousDelivery
 
-# ---------------------------------------------------
-# Jobs
-# ---------------------------------------------------
-jobs:
-  build:
-    runs-on: ubuntu-latest
+  staging:
+    regex: ^staging$
+    increment: Patch
+    label: beta
+    mode: ContinuousDeployment
 
-    steps:
-      # ---------------------------------------------------
-      # Step 1: Checkout repo with full history and tags
-      # Required by GitVersion to walk history & tags
-      # ---------------------------------------------------
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
+  feature:
+    regex: ^features?[/-]
+    increment: Minor
+    label: alpha
+    mode: ContinuousDeployment
 
-      # ---------------------------------------------------
-      # Step 2: Install GitVersion (latest stable v6.3.x)
-      # ---------------------------------------------------
-      - name: Install GitVersion
-        uses: GitTools/actions/gitversion/setup@v4.1.0
-        with:
-          versionSpec: '6.3.x'
+  fix:
+    regex: ^fix(es)?[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
 
-      # ---------------------------------------------------
-      # Step 3: Run GitVersion with config file
-      # Will output variables like:
-      #   fullSemVer: 1.2.3-beta.1
-      #   semVer: 1.2.3-beta.1
-      #   nuGetVersionV2: 1.2.3-beta0001
-      #   assemblySemVer: 1.2.3.0
-      # ---------------------------------------------------
-      - name: Determine Version
-        id: gitversion
-        uses: GitTools/actions/gitversion/execute@v4.1.0
-        with:
-          configFilePath: GitVersion.yml
+  hotfix:
+    regex: ^hotfix(es)?[/-]
+    increment: Patch
+    label: ''
+    mode: ContinuousDelivery
 
-      # ---------------------------------------------------
-      # Step 4: Display version outputs (debugging/logging)
-      # ---------------------------------------------------
-      - name: Display GitVersion outputs
-        run: |
-          echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
-          echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
-          echo "NuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
-          echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
+  release:
+    regex: ^releases?[/-]
+    increment: Minor
+    label: rc
+    mode: ContinuousDelivery
 
-      # ---------------------------------------------------
-      # Step 5: Setup .NET SDK (9.x)
-      # ---------------------------------------------------
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
+  chore:
+    regex: ^chore[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
 
-      # ---------------------------------------------------
-      # Step 6: Restore dependencies
-      # ---------------------------------------------------
-      - name: Restore dependencies
-        run: dotnet restore
+  refactor:
+    regex: ^refactor[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
 
-      # ---------------------------------------------------
-      # Step 7: Build in Release mode
-      # Injects GitVersion's semVer into assembly version
-      # ---------------------------------------------------
-      - name: Build
-        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.semVer }}
-
-      # ---------------------------------------------------
-      # Step 8: Run tests (for all branches)
-      # ---------------------------------------------------
-      - name: Run Tests
-        run: dotnet test --no-build --configuration Release --verbosity normal
-
-      # ---------------------------------------------------
-      # Step 9: Login to DockerHub (only staging/main)
-      # ---------------------------------------------------
-      - name: Login to DockerHub
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # ---------------------------------------------------
-      # Step 10: Build & Push STAGING image
-      # Uses SemVer + floating tag 'staging'
-      # ---------------------------------------------------
-      - name: Build & Push Staging Image
-        if: github.ref == 'refs/heads/staging'
-        run: |
-          VERSION=${{ steps.gitversion.outputs.semVer }}
-          echo "Building staging version $VERSION"
-
-          docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging \
-            -f ProductDemo/Dockerfile .
-
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
-
-      # ---------------------------------------------------
-      # Step 11: Build & Push PRODUCTION image
-      # Uses SemVer + floating tag 'latest'
-      # ---------------------------------------------------
-      - name: Build & Push Prod Image
-        if: github.ref == 'refs/heads/main'
-        run: |
-          VERSION=${{ steps.gitversion.outputs.semVer }}
-          echo "Building production version $VERSION"
-
-          docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest \
-            -f ProductDemo/Dockerfile .
-
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
+  docs:
+    regex: ^docs[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
