@@ -1,0 +1,107 @@
+# -------------------------------
+# Name of the workflow (shows up in GitHub Actions tab)
+# -------------------------------
+name: CI/CD Pipeline
+
+# -------------------------------
+# Triggers: when should this pipeline run?
+# -------------------------------
+on:
+  push:
+    branches:
+      - main       # run when pushing to main (production)
+      - staging    # run when pushing to staging (pre-prod/QA)
+      - 'feature/*' # run when pushing to feature branches
+  pull_request:
+    branches:
+      - staging    # also run when opening a PR into staging
+      - main       # also run when opening a PR into main
+
+# -------------------------------
+# Jobs: each job defines tasks to run
+# We only have one job called "build"
+# -------------------------------
+jobs:
+  build:
+    runs-on: ubuntu-latest   # GitHub provides a fresh Ubuntu VM for us
+
+    steps:
+      # -------------------------------
+      # Step 1: Checkout the repo code
+      # -------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------
+      # Step 2: Install .NET SDK (so dotnet commands work)
+      # -------------------------------
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'   # use the latest .NET 9 SDK
+
+      # -------------------------------
+      # Step 3: Restore dependencies
+      # Downloads NuGet packages for all csproj files
+      # -------------------------------
+      - name: Restore dependencies
+        run: dotnet restore
+
+      # -------------------------------
+      # Step 4: Build the project in Release mode
+      # -------------------------------
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      # -------------------------------
+      # Step 5: Run unit/integration tests
+      # -------------------------------
+      - name: Run Tests
+        run: dotnet test --no-build --configuration Release --verbosity normal
+
+      # -------------------------------
+      # Step 6: Login to DockerHub
+      # Uses GitHub secrets (set in repo → Settings → Secrets → Actions)
+      # Only runs if branch is main OR staging
+      # -------------------------------
+      - name: Login to DockerHub
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # -------------------------------
+      # Step 7: Build & Push STAGING image
+      # If on staging branch, push "product-api:staging"
+      # This is your QA/pre-prod image
+      # -------------------------------
+      - name: Build & Push Staging Image
+        if: github.ref == 'refs/heads/staging'
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging \
+            -f ProductDemo/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
+
+      # -------------------------------
+      # Step 8: Build & Push PRODUCTION image
+      # If on main branch:
+      #   - Push "product-api:latest"
+      #   - Push a frozen version (e.g., 1.0.0) from the VERSION file
+      # -------------------------------
+      - name: Build & Push Prod Image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          VERSION=$(cat VERSION)   # read version number from VERSION file
+          echo "Building version $VERSION"
+
+          # Build Docker image with 2 tags: latest + semantic version
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
+            -f ProductDemo/Dockerfile .
+
+          # Push both tags to DockerHub
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION

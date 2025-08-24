@@ -16,7 +16,8 @@ services:
   productapi:
     build:
       context: .                  # Root of repo as Docker build context (so it sees .sln + all projects)
-      dockerfile: ProductDemo/Dockerfile # Explicitly point to API Dockerfile inside ProductDemo folder
+      dockerfile: ProductDemo/Dockerfile   # <-- use Dockerfile here 
+                                               # Explicitly point to API Dockerfile inside ProductDemo folder
     container_name: product-api    # Fixed container name instead of random generated
     ports:
       - "5000:8080"                # Maps container's port 8080 -> localhost:5000 (API Swagger/UI lives here)
