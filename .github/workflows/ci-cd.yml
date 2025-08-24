@@ -9,13 +9,17 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main       # run when pushing to main (production)
-      - staging    # run when pushing to staging (pre-prod/QA)
-      - 'feature/*' # run when pushing to feature branches
+      - main         # production branch → stable releases
+      - staging      # pre-prod/QA branch → beta prereleases
+      - 'feature/*'  # feature branches → alpha prereleases (build + test only)
+      - 'fix/*'      # fix branches → alpha prereleases (build + test only)
+      - 'chore/*'    # chores (infra/config) → alpha prereleases (build + test only)
+      - 'refactor/*' # refactors → alpha prereleases (build + test only)
+      - 'docs/*'     # docs → alpha prereleases (build + test only)
   pull_request:
     branches:
-      - staging    # also run when opening a PR into staging
-      - main       # also run when opening a PR into main
+      - staging      # validate PRs into staging
+      - main         # validate PRs into main
 
 # -------------------------------
 # Jobs: each job defines tasks to run
@@ -33,7 +37,27 @@ jobs:
         uses: actions/checkout@v4
 
       # -------------------------------
-      # Step 2: Install .NET SDK (so dotnet commands work)
+      # Step 2: Install GitVersion
+      # GitVersion analyzes git history + branch to auto-generate SemVer
+      # -------------------------------
+      - name: Install GitVersion
+        uses: GitTools/actions/gitversion/setup@v0.10.2
+        with:
+          versionSpec: '5.x'
+
+      # -------------------------------
+      # Step 3: Run GitVersion
+      # Exposes outputs like:
+      #   steps.gitversion.outputs.SemVer → 1.2.3-beta.1
+      #   steps.gitversion.outputs.MajorMinorPatch → 1.2.3
+      #   steps.gitversion.outputs.PreReleaseLabel → beta
+      # -------------------------------
+      - name: Run GitVersion
+        id: gitversion
+        uses: GitTools/actions/gitversion/execute@v0.10.2
+
+      # -------------------------------
+      # Step 4: Install .NET SDK (so dotnet commands work)
       # -------------------------------
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -41,28 +65,29 @@ jobs:
           dotnet-version: '9.0.x'   # use the latest .NET 9 SDK
 
       # -------------------------------
-      # Step 3: Restore dependencies
+      # Step 5: Restore dependencies
       # Downloads NuGet packages for all csproj files
       # -------------------------------
       - name: Restore dependencies
         run: dotnet restore
 
       # -------------------------------
-      # Step 4: Build the project in Release mode
+      # Step 6: Build the project in Release mode
+      # Inject GitVersion output into /p:Version so assembly & NuGet get correct SemVer
       # -------------------------------
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.SemVer }}
 
       # -------------------------------
-      # Step 5: Run unit/integration tests
+      # Step 7: Run unit/integration tests
+      # Runs for all branches (feature/fix/chore/etc + staging + main)
       # -------------------------------
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
       # -------------------------------
-      # Step 6: Login to DockerHub
-      # Uses GitHub secrets (set in repo → Settings → Secrets → Actions)
-      # Only runs if branch is main OR staging
+      # Step 8: Login to DockerHub
+      # Only runs if branch is main OR staging (feature/fix/chore/etc skip Docker push)
       # -------------------------------
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
@@ -72,36 +97,41 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # -------------------------------
-      # Step 7: Build & Push STAGING image
-      # If on staging branch, push "product-api:staging"
-      # This is your QA/pre-prod image
+      # Step 9: Build & Push STAGING image
+      # If on staging branch:
+      #   - Push product-api:<SemVer> (e.g., 1.2.4-beta.1)
+      #   - Push product-api:staging (floating tag for QA)
       # -------------------------------
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
         run: |
+          VERSION=${{ steps.gitversion.outputs.SemVer }}
+          echo "Building staging version $VERSION"
+
           docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging \
             -f ProductDemo/Dockerfile .
+
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
 
       # -------------------------------
-      # Step 8: Build & Push PRODUCTION image
+      # Step 10: Build & Push PRODUCTION image
       # If on main branch:
-      #   - Push "product-api:latest"
-      #   - Push a frozen version (e.g., 1.0.0) from the VERSION file
+      #   - Push product-api:<SemVer> (e.g., 1.2.4)
+      #   - Push product-api:latest (floating tag for consumers)
       # -------------------------------
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main'
         run: |
-          VERSION=$(cat VERSION)   # read version number from VERSION file
-          echo "Building version $VERSION"
+          VERSION=${{ steps.gitversion.outputs.SemVer }}
+          echo "Building production version $VERSION"
 
-          # Build Docker image with 2 tags: latest + semantic version
           docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest \
             -f ProductDemo/Dockerfile .
 
-          # Push both tags to DockerHub
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest

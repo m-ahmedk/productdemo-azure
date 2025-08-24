@@ -1,0 +1,33 @@
+mode: ContinuousDeployment
+
+branches:
+  main:
+    tag: ''
+    increment: patch
+  staging:
+    tag: beta
+    increment: patch
+  feature:
+    tag: alpha
+    increment: minor
+  fix:
+    tag: alpha
+    increment: patch
+  hotfix:
+    tag: ''
+    increment: patch
+  release:
+    tag: rc
+    increment: minor
+  chore:
+    tag: alpha
+    increment: patch
+  refactor:
+    tag: alpha
+    increment: patch
+  docs:
+    tag: alpha
+    increment: patch
+
+ignore:
+  sha: []
