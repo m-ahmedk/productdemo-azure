@@ -21,7 +21,7 @@ jobs:
 
     steps:
       # -------------------------------
-      # Step 1: Checkout repo with full history (needed for GitVersion)
+      # Step 1: Checkout with full history
       # -------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,13 +29,14 @@ jobs:
           fetch-depth: 0
 
       # -------------------------------
-      # Step 2: Ensure tags are fetched (important for GitVersion base versions)
+      # Step 2: Ensure tags are available
+      # Required so GitVersion can find v0.1.0 baseline
       # -------------------------------
       - name: Fetch tags
-        run: git fetch --tags --force
+        run: git fetch --unshallow --tags --prune --progress
 
       # -------------------------------
-      # Step 3: Install GitVersion (v6.3.x)
+      # Step 3: Install GitVersion (latest stable v6.3.x)
       # -------------------------------
       - name: Install GitVersion
         uses: GitTools/actions/gitversion/setup@v4.1.0
@@ -43,7 +44,7 @@ jobs:
           versionSpec: '6.3.x'
 
       # -------------------------------
-      # Step 4: Run GitVersion with config
+      # Step 4: Run GitVersion
       # -------------------------------
       - name: Determine Version
         id: gitversion
@@ -87,8 +88,8 @@ jobs:
         run: dotnet restore
 
       # -------------------------------
-      # Step 9: Build project with GitVersion version
-      # Use fullSemVer for assemblies
+      # Step 9: Build project
+      # Inject GitVersion fullSemVer into assemblies
       # -------------------------------
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.fullSemVer }}
@@ -113,6 +114,7 @@ jobs:
       # Step 12: Setup Docker Buildx (for caching)
       # -------------------------------
       - name: Setup Docker Buildx
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
         uses: docker/setup-buildx-action@v3
 
       # -------------------------------
