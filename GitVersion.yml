@@ -1,30 +1,29 @@
 # ===============================
-# GitVersion.yml for GitHub Flow
-# Industry best practice config (v6.x)
+# GitVersion.yml (v6.x schema)
+# Industry best practice for GitHub Flow
 # ===============================
 
-# Use GitHubFlow strategy (feature → staging → main)
 workflow: GitHubFlow/v1
 
-# Standard SemVer formatting
+# Version formatting
 tag-prefix: '[vV]?'
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
 semantic-version-format: FullSemVer
 update-build-number: true
 
-# Bump rules based on commit messages
+# Commit message rules
 major-version-bump-message: '\+semver:\s?(breaking|major)'
 minor-version-bump-message: '\+semver:\s?(feature|minor)'
 patch-version-bump-message: '\+semver:\s?(fix|patch)'
 no-bump-message: '\+semver:\s?(none|skip)'
 
-# Branch-specific rules
 branches:
   main:
     regex: ^main$|^master$
     increment: Patch
     prevent-increment-of-merged-branch-version: true
+    track-merge-message: true
     label: ''
     mode: ContinuousDelivery
 
