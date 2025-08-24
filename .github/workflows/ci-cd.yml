@@ -53,7 +53,6 @@ jobs:
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
-          useConfigFile: true
           configFilePath: GitVersion.yml
 
       # -------------------------------
@@ -62,9 +61,9 @@ jobs:
       # -------------------------------
       - name: Display GitVersion outputs
         run: |
-          echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
-          echo "NuGetVersion: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
-          echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
+          echo "fullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
+          echo "nuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
+          echo "assemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
 
       # -------------------------------
       # Step 5: Setup .NET SDK
