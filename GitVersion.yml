@@ -1,6 +1,9 @@
 # GitHub Flow strategy for GitVersion v6.x
 workflow: GitHubFlow/v1
 
+# Starting point if no tags exist
+next-version: 0.1.0
+
 tag-prefix: '[vV]?'
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
@@ -15,7 +18,7 @@ no-bump-message: '\+semver:\s?(none|skip)'
 branches:
   main:
     regex: ^main$|^master$
-    increment: Inherit   # ✅ v6.x way
+    increment: Inherit
     track-merge-message: true
     label: ''
     mode: ContinuousDelivery
