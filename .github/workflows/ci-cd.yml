@@ -33,7 +33,7 @@ jobs:
       # Required so GitVersion can find v0.1.0 baseline
       # -------------------------------
       - name: Fetch tags
-        run: git fetch --unshallow --tags --prune --progress
+        run: git fetch --tags --prune --progress
 
       # -------------------------------
       # Step 3: Install GitVersion (latest stable v6.3.x)
