@@ -1,33 +1,85 @@
-mode: ContinuousDeployment
+# -------------------------------
+# GitVersion configuration
+# Industry best practice: GitHub Flow strategy
+# -------------------------------
+workflow: GitHubFlow/v1
 
+# -------------------------------
+# Semantic versioning behavior
+# -------------------------------
+tag-prefix: '[vV]?'                 # match tags like v1.2.3 or 1.2.3
+assembly-versioning-scheme: MajorMinorPatch
+assembly-file-versioning-scheme: MajorMinorPatch
+semantic-version-format: FullSemVer
+update-build-number: true            # update CI build numbers with SemVer
+
+# -------------------------------
+# Commit message keywords to bump versions manually
+# Usage in commit message: "+semver: major|minor|patch|none"
+# -------------------------------
+major-version-bump-message: '\+semver:\s?(breaking|major)'
+minor-version-bump-message: '\+semver:\s?(feature|minor)'
+patch-version-bump-message: '\+semver:\s?(fix|patch)'
+no-bump-message: '\+semver:\s?(none|skip)'
+
+# -------------------------------
+# Branch-specific versioning rules
+# -------------------------------
 branches:
   main:
-    tag: ''
-    increment: patch
-  staging:
-    tag: beta
-    increment: patch
-  feature:
-    tag: alpha
-    increment: minor
-  fix:
-    tag: alpha
-    increment: patch
-  hotfix:
-    tag: ''
-    increment: patch
-  release:
-    tag: rc
-    increment: minor
-  chore:
-    tag: alpha
-    increment: patch
-  refactor:
-    tag: alpha
-    increment: patch
-  docs:
-    tag: alpha
-    increment: patch
+    regex: ^main$|^master$
+    increment: Patch
+    prevent-increment-of-merged-branch-version: true
+    track-merge-message: true
+    label: ''                       # no prerelease label → stable
+    mode: ContinuousDelivery
 
-ignore:
-  sha: []
+  staging:
+    regex: ^staging$
+    increment: Patch
+    label: beta                     # produces versions like 1.2.3-beta.1
+    mode: ContinuousDeployment
+
+  feature:
+    regex: ^features?[/-]
+    increment: Minor
+    tag: 'feature'
+    label: alpha                    # produces versions like 1.3.0-alpha.5
+    track-merge-target: false
+    track-merge-message: false
+
+  fix:
+    regex: ^fix(es)?[/-]
+    increment: Patch
+    label: alpha                    # e.g., 1.2.4-alpha.7
+    mode: ContinuousDeployment
+
+  hotfix:
+    regex: ^hotfix(es)?[/-]
+    increment: Patch
+    label: ''
+    mode: ContinuousDeployment
+
+  release:
+    regex: ^releases?[/-]
+    increment: Minor
+    label: rc                       # e.g., 1.3.0-rc.1
+    mode: ContinuousDeployment
+
+  chore:
+    regex: ^chore[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
+
+  refactor:
+    regex: ^refactor[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment
+
+  docs:
+    regex: ^docs[/-]
+    increment: Patch
+    label: alpha
+    mode: ContinuousDeployment

@@ -21,10 +21,6 @@ on:
       - staging      # validate PRs into staging
       - main         # validate PRs into main
 
-# -------------------------------
-# Jobs: each job defines tasks to run
-# We only have one job called "build"
-# -------------------------------
 jobs:
   build:
     runs-on: ubuntu-latest   # GitHub provides a fresh Ubuntu VM for us
@@ -32,62 +28,75 @@ jobs:
     steps:
       # -------------------------------
       # Step 1: Checkout the repo code
+      # Use fetch-depth: 0 → required for GitVersion
       # -------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # -------------------------------
       # Step 2: Install GitVersion
-      # GitVersion analyzes git history + branch to auto-generate SemVer
+      # Wrapper version: v4.1.0 (latest)
+      # Tool version: 6.3.x (latest stable)
       # -------------------------------
       - name: Install GitVersion
-        uses: GitTools/actions/gitversion/setup@v0.10.2
+        uses: GitTools/actions/gitversion/setup@v4.1.0
         with:
-          versionSpec: '5.x'
+          versionSpec: '6.3.x'
 
       # -------------------------------
-      # Step 3: Run GitVersion
-      # Exposes outputs like:
-      #   steps.gitversion.outputs.SemVer → 1.2.3-beta.1
-      #   steps.gitversion.outputs.MajorMinorPatch → 1.2.3
-      #   steps.gitversion.outputs.PreReleaseLabel → beta
+      # Step 3: Run GitVersion with config
+      # Uses GitVersion.yml in repo root
       # -------------------------------
-      - name: Run GitVersion
+      - name: Determine Version
         id: gitversion
-        uses: GitTools/actions/gitversion/execute@v0.10.2
+        uses: GitTools/actions/gitversion/execute@v4.1.0
+        with:
+          useConfigFile: true
+          configFilePath: GitVersion.yml
 
       # -------------------------------
-      # Step 4: Install .NET SDK (so dotnet commands work)
+      # Step 4: Show version in logs
+      # Makes it easy to confirm CI versioning
+      # -------------------------------
+      - name: Display GitVersion outputs
+        run: |
+          echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
+          echo "NuGetVersion: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
+          echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
+
+      # -------------------------------
+      # Step 5: Setup .NET SDK
       # -------------------------------
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'   # use the latest .NET 9 SDK
+          dotnet-version: '9.0.x'
 
       # -------------------------------
-      # Step 5: Restore dependencies
-      # Downloads NuGet packages for all csproj files
+      # Step 6: Restore dependencies
       # -------------------------------
       - name: Restore dependencies
         run: dotnet restore
 
       # -------------------------------
-      # Step 6: Build the project in Release mode
-      # Inject GitVersion output into /p:Version so assembly & NuGet get correct SemVer
+      # Step 7: Build
+      # Pass GitVersion’s FullSemVer into /p:Version
       # -------------------------------
       - name: Build
-        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.SemVer }}
+        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.fullSemVer }}
 
       # -------------------------------
-      # Step 7: Run unit/integration tests
-      # Runs for all branches (feature/fix/chore/etc + staging + main)
+      # Step 8: Run tests
+      # Runs for all branches
       # -------------------------------
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
       # -------------------------------
-      # Step 8: Login to DockerHub
-      # Only runs if branch is main OR staging (feature/fix/chore/etc skip Docker push)
+      # Step 9: Login to DockerHub
+      # Only runs for staging + main
       # -------------------------------
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
@@ -97,15 +106,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # -------------------------------
-      # Step 9: Build & Push STAGING image
-      # If on staging branch:
-      #   - Push product-api:<SemVer> (e.g., 1.2.4-beta.1)
-      #   - Push product-api:staging (floating tag for QA)
+      # Step 10: Build & Push STAGING image
+      # Tags:
+      #   product-api:<FullSemVer> (e.g., 1.2.3-beta.1)
+      #   product-api:staging (floating QA tag)
       # -------------------------------
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
         run: |
-          VERSION=${{ steps.gitversion.outputs.SemVer }}
+          VERSION=${{ steps.gitversion.outputs.fullSemVer }}
           echo "Building staging version $VERSION"
 
           docker build \
@@ -117,15 +126,15 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
 
       # -------------------------------
-      # Step 10: Build & Push PRODUCTION image
-      # If on main branch:
-      #   - Push product-api:<SemVer> (e.g., 1.2.4)
-      #   - Push product-api:latest (floating tag for consumers)
+      # Step 11: Build & Push PRODUCTION image
+      # Tags:
+      #   product-api:<FullSemVer> (e.g., 1.2.3)
+      #   product-api:latest (floating stable tag)
       # -------------------------------
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main'
         run: |
-          VERSION=${{ steps.gitversion.outputs.SemVer }}
+          VERSION=${{ steps.gitversion.outputs.fullSemVer }}
           echo "Building production version $VERSION"
 
           docker build \
