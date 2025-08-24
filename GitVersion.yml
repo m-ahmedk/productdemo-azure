@@ -1,20 +1,28 @@
-# GitHub Flow based GitVersion config (v6.x) – Industry best practice
+# GitHub Flow strategy for GitVersion v6.x
 workflow: GitHubFlow/v1
 
-# Versioning schemes
+# Versioning schemes (valid options only)
 tag-prefix: '[vV]?'
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
-semantic-version-format: SemVer   # FIXED: was FullSemVer → use SemVer
+
+# Controls the AssemblyInformationalVersion format
+# Popular choices include FullSemVer or custom strings using variables
+assembly-informational-format: '{FullSemVer}'
+
+# Include build metadata in assembly version if needed
 update-build-number: true
 
-# Commit message overrides
+# Commit message rules for bumping versions
 major-version-bump-message: '\+semver:\s?(breaking|major)'
 minor-version-bump-message: '\+semver:\s?(feature|minor)'
 patch-version-bump-message: '\+semver:\s?(fix|patch)'
 no-bump-message: '\+semver:\s?(none|skip)'
 
-# Branch-specific rules
+# Optional: weight to control pre-release numbering (advanced)
+# tag-pre-release-weight: 60000
+
+# Branch-specific version rules
 branches:
   main:
     regex: ^main$|^master$
