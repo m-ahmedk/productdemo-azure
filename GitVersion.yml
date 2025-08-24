@@ -1,25 +1,30 @@
-# -------------------------------
-# GitVersion configuration (v6+)
-# Using GitHubFlow workflow
-# -------------------------------
+# ===============================
+# GitVersion.yml for GitHub Flow
+# Industry best practice config (v6.x)
+# ===============================
+
+# Use GitHubFlow strategy (feature → staging → main)
 workflow: GitHubFlow/v1
 
-# Semantic version formatting
+# Standard SemVer formatting
+tag-prefix: '[vV]?'
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
 semantic-version-format: FullSemVer
 update-build-number: true
 
-# Commit message overrides
+# Bump rules based on commit messages
 major-version-bump-message: '\+semver:\s?(breaking|major)'
 minor-version-bump-message: '\+semver:\s?(feature|minor)'
 patch-version-bump-message: '\+semver:\s?(fix|patch)'
 no-bump-message: '\+semver:\s?(none|skip)'
 
+# Branch-specific rules
 branches:
   main:
     regex: ^main$|^master$
     increment: Patch
+    prevent-increment-of-merged-branch-version: true
     label: ''
     mode: ContinuousDelivery
 
@@ -45,13 +50,13 @@ branches:
     regex: ^hotfix(es)?[/-]
     increment: Patch
     label: ''
-    mode: ContinuousDeployment
+    mode: ContinuousDelivery
 
   release:
     regex: ^releases?[/-]
     increment: Minor
     label: rc
-    mode: ContinuousDeployment
+    mode: ContinuousDelivery
 
   chore:
     regex: ^chore[/-]
