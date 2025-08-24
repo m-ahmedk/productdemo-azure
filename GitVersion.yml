@@ -1,17 +1,20 @@
-# GitHub Flow based GitVersion config (v6.x) – Industry standard
+# GitHub Flow based GitVersion config (v6.x) – Industry best practice
 workflow: GitHubFlow/v1
 
+# Versioning schemes
 tag-prefix: '[vV]?'
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
-semantic-version-format: FullSemVer
+semantic-version-format: SemVer   # FIXED: was FullSemVer → use SemVer
 update-build-number: true
 
+# Commit message overrides
 major-version-bump-message: '\+semver:\s?(breaking|major)'
 minor-version-bump-message: '\+semver:\s?(feature|minor)'
 patch-version-bump-message: '\+semver:\s?(fix|patch)'
 no-bump-message: '\+semver:\s?(none|skip)'
 
+# Branch-specific rules
 branches:
   main:
     regex: ^main$|^master$
