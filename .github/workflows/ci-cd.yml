@@ -1,21 +1,15 @@
-# -------------------------------
-# Name of the workflow (shows up in GitHub Actions tab)
-# -------------------------------
 name: CI/CD Pipeline
 
-# -------------------------------
-# Triggers: when should this pipeline run?
-# -------------------------------
 on:
   push:
     branches:
-      - main         # production branch → stable releases
-      - staging      # pre-prod/QA branch → beta prereleases
-      - 'feature/*'  # feature branches → alpha prereleases (build + test only)
-      - 'fix/*'      # fix branches → alpha prereleases (build + test only)
-      - 'chore/*'    # chores (infra/config) → alpha prereleases (build + test only)
-      - 'refactor/*' # refactors → alpha prereleases (build + test only)
-      - 'docs/*'     # docs → alpha prereleases (build + test only)
+      - main
+      - staging
+      - 'feature/*'
+      - 'fix/*'
+      - 'chore/*'
+      - 'refactor/*'
+      - 'docs/*'
   pull_request:
     branches:
       - staging
@@ -26,75 +20,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------------
-      # Step 1: Checkout full history (needed for GitVersion)
-      # -------------------------------
+      # 1. Checkout repo with full history (required by GitVersion)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # -------------------------------
-      # Step 2: Install GitVersion (latest stable 6.3.x)
-      # -------------------------------
+      # 2. Install GitVersion (latest stable 6.3.x)
       - name: Install GitVersion
         uses: GitTools/actions/gitversion/setup@v4.1.0
         with:
           versionSpec: '6.3.x'
 
-      # -------------------------------
-      # Step 3: Run GitVersion with config file
-      # Exposes camelCase outputs (v6):
-      #   steps.gitversion.outputs.fullSemVer → 1.2.3-beta.1
-      #   steps.gitversion.outputs.semVer     → 1.2.3-beta.1
-      #   steps.gitversion.outputs.nuGetVersionV2 → 1.2.3-beta0001
-      # -------------------------------
+      # 3. Run GitVersion with config file
       - name: Determine Version
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
-          useConfigFile: true
-          configFilePath: GitVersion.yml
+          configFilePath: GitVersion.yml   # ✅ only this, no useConfigFile
 
-      # -------------------------------
-      # Step 4: Display version info in logs (debugging)
-      # -------------------------------
+      # 4. Show calculated version in logs
       - name: Display GitVersion outputs
         run: |
-          echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
-          echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
-          echo "NuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
-          echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
+          echo "fullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
+          echo "semVer: ${{ steps.gitversion.outputs.semVer }}"
+          echo "nuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
+          echo "assemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
 
-      # -------------------------------
-      # Step 5: Setup .NET
-      # -------------------------------
+      # 5. Setup .NET
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # -------------------------------
-      # Step 6: Restore dependencies
-      # -------------------------------
+      # 6. Restore
       - name: Restore dependencies
         run: dotnet restore
 
-      # -------------------------------
-      # Step 7: Build with GitVersion output
-      # -------------------------------
+      # 7. Build with GitVersion’s semVer
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.semVer }}
 
-      # -------------------------------
-      # Step 8: Run Tests
-      # -------------------------------
+      # 8. Test
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
-      # -------------------------------
-      # Step 9: Login to DockerHub
-      # -------------------------------
+      # 9. Login to DockerHub (staging & main only)
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
         uses: docker/login-action@v3
@@ -102,9 +73,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # -------------------------------
-      # Step 10: Build & Push STAGING image
-      # -------------------------------
+      # 10. Push staging images
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
         run: |
@@ -119,9 +88,7 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
 
-      # -------------------------------
-      # Step 11: Build & Push PRODUCTION image
-      # -------------------------------
+      # 11. Push production images
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main'
         run: |
