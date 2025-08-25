@@ -4,6 +4,10 @@
 # ---------------------------------------------------
 name: CI/CD Pipeline
 
+# Push to main -> production build & push
+# Push to staging -> staging build & push
+# Push to feature/*, fix/*, etc. -> only build & test (no push)
+# PR to staging or main -> runs pipeline for validation
 on:
   push:
     branches:
@@ -21,13 +25,16 @@ on:
 
 jobs:
   build:
+    # Runs on GitHub's Ubuntu VM (clean environment each time)
     runs-on: ubuntu-latest
 
     steps:
       # Step 1: Checkout repo with full history
       - name: Checkout repository
+        # Gets repo code
         uses: actions/checkout@v4
         with:
+          # full history (important for GitVersion)
           fetch-depth: 0
 
       # Step 2: Ensure tags are present
