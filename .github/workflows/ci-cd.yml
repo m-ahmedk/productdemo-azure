@@ -103,7 +103,7 @@ jobs:
 
       # Step 12: Build & Push production image
       - name: Build & Push Prod Image
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           VERSION=${{ steps.gitversion.outputs.semVer }}
           echo "Building production version $VERSION"
@@ -114,9 +114,17 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
       
-      # Step 13: Tag version on push
+      # Step 13: Authenticate github before pushing tag
+      - name: Configure Git auth
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+      # Step 14: Tag version on push
       - name: Create Git tag
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           VERSION=${{ steps.gitversion.outputs.semVer }}
           git config user.name "github-actions[bot]"
