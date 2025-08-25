@@ -1,81 +1,84 @@
 # ---------------------------------------------------
 # GitVersion configuration (v6.x)
-# Production-ready, works with GitHub Actions
+# This tells GitVersion how to calculate versions
 # ---------------------------------------------------
 
-# Starting version (first tag fallback)
-next-version: 0.1.0
+# Starting version if no tags exist yet
+next-version: 0.1.0   # Your very first tag fallback
 
-# Strict SemVer formatting
+# Force strict SemVer format (no weird builds like 1.0.0+metadata)
 semantic-version-format: Strict
 
-# Accepts tags like v1.0.0 or 1.0.0
+# Accept both v1.0.0 and 1.0.0 as valid tags
 tag-prefix: '[vV]?'
 
-# Assembly versioning
+# How assembly versions in .NET are written:
+# Both normal AssemblyVersion and AssemblyFileVersion
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
 
-# Commit message overrides
+# Allow overriding version bumps with commit messages
+# Example: commit "fix: corrected typo +semver: patch" → bumps patch
 major-version-bump-message: '\+semver:\s?(breaking|major)'
 minor-version-bump-message: '\+semver:\s?(feature|minor)'
 patch-version-bump-message: '\+semver:\s?(fix|patch)'
-no-bump-message: '\+semver:\s?(none|skip)'
+no-bump-message:    '\+semver:\s?(none|skip)'
 
 # ---------------------------------------------------
-# Branch configuration
+# Branch configuration (how versions are calculated
+# based on which branch you are building from)
 # ---------------------------------------------------
 branches:
   main:
-    regex: ^main$
-    increment: Patch
-    label: ''
-    mode: ContinuousDeployment   # Always clean SemVer
+    regex: ^main$             # Match the "main" branch
+    increment: Patch          # Default bump = Patch
+    label: ''                 # No suffix → clean versions (1.0.0)
+    mode: ContinuousDeployment # Always give clean SemVer
 
   staging:
-    regex: ^staging$
-    increment: Patch
-    label: beta
-    mode: ContinuousDeployment   # beta prereleases
+    regex: ^staging$          # Match "staging" branch
+    increment: Patch          # Default bump = Patch
+    label: beta               # Adds suffix → 1.0.1-beta.1
+    mode: ContinuousDeployment
 
   feature:
-    regex: ^features?[/-]
-    increment: Minor
-    label: alpha
-    mode: ContinuousDeployment   # alpha prereleases
+    regex: ^features?[/-]     # Matches feature/* branches
+    increment: Minor          # New features bump MINOR
+    label: alpha              # Adds suffix → 1.1.0-alpha.5
+    mode: ContinuousDeployment
 
   fix:
-    regex: ^fix(es)?[/-]
-    increment: Patch
-    label: alpha
-    mode: ContinuousDeployment   # alpha prereleases
+    regex: ^fix(es)?[/-]      # Matches fix/* branches
+    increment: Patch          # Bugfixes bump PATCH
+    label: alpha              # Adds suffix → 1.0.2-alpha.3
+    mode: ContinuousDeployment
 
   hotfix:
-    regex: ^hotfix(es)?[/-]
+    regex: ^hotfix(es)?[/-]   # Matches hotfix/* branches
     increment: Patch
-    label: ''
-    mode: ContinuousDelivery     # stable hotfix
+    label: ''                 # No suffix → stable hotfix release
+    mode: ContinuousDelivery  # Treat as clean release
 
   release:
-    regex: ^releases?[/-]
-    increment: Minor
-    label: rc
-    mode: ContinuousDelivery     # release candidates
+    regex: ^releases?[/-]     # Matches release/* branches
+    increment: Minor          # Usually bump MINOR for releases
+    label: rc                 # Adds suffix → 1.2.0-rc.1
+    mode: ContinuousDelivery
 
   chore:
-    regex: ^chore[/-]
+    regex: ^chore[/-]         # Matches chore/* branches
     increment: Patch
-    label: alpha
+    label: alpha              # Adds suffix → 1.0.2-alpha.7
     mode: ContinuousDeployment
 
   refactor:
-    regex: ^refactor[/-]
+    regex: ^refactor[/-]      # Matches refactor/* branches
     increment: Patch
     label: alpha
     mode: ContinuousDeployment
 
   docs:
-    regex: ^docs[/-]
+    regex: ^docs[/-]          # Matches docs/* branches
     increment: Patch
     label: alpha
     mode: ContinuousDeployment
