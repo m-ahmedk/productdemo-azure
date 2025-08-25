@@ -18,7 +18,7 @@ assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
 
 # Allow overriding version bumps with commit messages
-# Example: commit "fix: corrected typo +semver: patch" → bumps patch
+# Example: commit "fix: corrected typo +semver: patch" -> bumps patch
 major-version-bump-message: '\+semver:\s?(breaking|major)'
 minor-version-bump-message: '\+semver:\s?(feature|minor)'
 patch-version-bump-message: '\+semver:\s?(fix|patch)'
@@ -32,43 +32,43 @@ branches:
   main:
     regex: ^main$             # Match the "main" branch
     increment: Patch          # Default bump = Patch
-    label: ''                 # No suffix → clean versions (1.0.0)
+    label: ''                 # No suffix -> clean versions (1.0.0)
     mode: ContinuousDeployment # Always give clean SemVer
 
   staging:
     regex: ^staging$          # Match "staging" branch
     increment: Patch          # Default bump = Patch
-    label: beta               # Adds suffix → 1.0.1-beta.1
+    label: beta               # Adds suffix -> 1.0.1-beta.1
     mode: ContinuousDeployment
 
   feature:
     regex: ^features?[/-]     # Matches feature/* branches
     increment: Minor          # New features bump MINOR
-    label: alpha              # Adds suffix → 1.1.0-alpha.5
+    label: alpha              # Adds suffix -> 1.1.0-alpha.5
     mode: ContinuousDeployment
 
   fix:
     regex: ^fix(es)?[/-]      # Matches fix/* branches
     increment: Patch          # Bugfixes bump PATCH
-    label: alpha              # Adds suffix → 1.0.2-alpha.3
+    label: alpha              # Adds suffix -> 1.0.2-alpha.3
     mode: ContinuousDeployment
 
   hotfix:
     regex: ^hotfix(es)?[/-]   # Matches hotfix/* branches
     increment: Patch
-    label: ''                 # No suffix → stable hotfix release
+    label: ''                 # No suffix -> stable hotfix release
     mode: ContinuousDelivery  # Treat as clean release
 
   release:
     regex: ^releases?[/-]     # Matches release/* branches
     increment: Minor          # Usually bump MINOR for releases
-    label: rc                 # Adds suffix → 1.2.0-rc.1
+    label: rc                 # Adds suffix -> 1.2.0-rc.1
     mode: ContinuousDelivery
 
   chore:
     regex: ^chore[/-]         # Matches chore/* branches
     increment: Patch
-    label: alpha              # Adds suffix → 1.0.2-alpha.7
+    label: alpha              # Adds suffix -> 1.0.2-alpha.7
     mode: ContinuousDeployment
 
   refactor:
