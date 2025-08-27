@@ -24,37 +24,38 @@ on:
       - main
 
 jobs:
+  # ---------------------------------------------------
+  # Job 1: Build (restore + compile)
+  # ---------------------------------------------------
   build:
-    # Runs on GitHub's Ubuntu VM (clean environment each time)
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repo with full history
+      # Checkout full repo (history & tags required for GitVersion)
       - name: Checkout repository
-        # Gets repo code
         uses: actions/checkout@v4
         with:
-          # full history (important for GitVersion)
           fetch-depth: 0
 
-      # Step 2: Ensure tags are present
+      # Ensure tags are present (GitVersion needs them)
       - name: Fetch tags
         run: git fetch --tags --prune --progress
 
-      # Step 3: Install GitVersion
+      # Install GitVersion (latest stable 6.3.x)
       - name: Install GitVersion
         uses: GitTools/actions/gitversion/setup@v4.1.0
         with:
           versionSpec: '6.3.x'
 
-      # Step 4: Run GitVersion
+      # Run GitVersion to calculate semantic version
       - name: Determine Version
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
           configFilePath: GitVersion.yml
 
-      # Step 5: Debug version outputs
+      # Display GitVersion outputs (debugging/logging)
       - name: Display GitVersion outputs
         run: |
           echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
@@ -62,37 +63,82 @@ jobs:
           echo "NuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
           echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
 
-      # Step 6: Setup .NET
+      # Setup .NET SDK
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # Step 7: Restore dependencies
+      # Restore NuGet dependencies
       - name: Restore dependencies
         run: dotnet restore
 
-      # Step 8: Build with version injected
+      # Build project with version injected from GitVersion
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.semVer }}
 
-      # Step 9: Run tests
+  # ---------------------------------------------------
+  # Job 2: Tests (unit/integration tests)
+  # Depends on Build
+  # ---------------------------------------------------
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: build   # Runs only if build succeeds
+
+    steps:
+      # Checkout repo again (fresh job = fresh VM)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Setup .NET SDK
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # Run test suite
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
-      # Step 10: Login to DockerHub (staging/main only)
+  # ---------------------------------------------------
+  # Job 3: Deploy (DockerHub + Git tag)
+  # Depends on Build & Test
+  # Only runs for staging/main
+  # ---------------------------------------------------
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      # Setup .NET (needed for docker builds using dotnet publish)
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # Login to DockerHub
       - name: Login to DockerHub
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 11: Build & Push staging image
+      # Build & Push STAGING image
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
         run: |
-          VERSION=${{ steps.gitversion.outputs.semVer }}
+          VERSION=${{ needs.build.outputs.semVer || 'latest' }}
           echo "Building staging version $VERSION"
           docker build \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
@@ -101,11 +147,11 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
 
-      # Step 12: Build & Push production image
+      # Build & Push PRODUCTION image
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
-          VERSION=${{ steps.gitversion.outputs.semVer }}
+          VERSION=${{ needs.build.outputs.semVer || 'latest' }}
           echo "Building production version $VERSION"
           docker build \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
@@ -113,8 +159,8 @@ jobs:
             -f ProductDemo/Dockerfile .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
-      
-      # Step 13: Authenticate github before pushing tag
+
+      # Configure Git auth for tagging
       - name: Configure Git auth
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
@@ -122,12 +168,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
 
-      # Step 14: Tag version on push
+      # Create Git tag for release
       - name: Create Git tag
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
-          VERSION=${{ steps.gitversion.outputs.semVer }}
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          VERSION=${{ needs.build.outputs.semVer || 'latest' }}
           git tag v$VERSION
           git push origin v$VERSION
