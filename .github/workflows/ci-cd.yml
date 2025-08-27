@@ -23,6 +23,7 @@ on:
       - staging
       - main
 
+# Named jobs for better readability and workflow configurations
 jobs:
   # ---------------------------------------------------
   # Job 1: Build (restore + compile)
