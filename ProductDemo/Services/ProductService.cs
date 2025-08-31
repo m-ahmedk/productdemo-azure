@@ -1,4 +1,5 @@
-﻿using ProductDemo.Models;
+﻿using Microsoft.ApplicationInsights;
+using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
 
 namespace ProductDemo.Services;
@@ -6,10 +7,12 @@ namespace ProductDemo.Services;
 public class ProductService : IProductService
 {
     private readonly IProductRepository _repository;
+    private readonly TelemetryClient _telemetry;
 
-    public ProductService(IProductRepository repository)
+    public ProductService(IProductRepository repository, TelemetryClient telemetry)
     {
         _repository = repository;
+        _telemetry = telemetry;
     }
 
     public async Task<Product> AddAsync(Product product)
@@ -20,6 +23,10 @@ public class ProductService : IProductService
             throw new InvalidOperationException("Product name must be unique.");
 
         await _repository.AddAsync(product);
+
+        // Track custom metric to show in AI
+        _telemetry.GetMetric("ProductsCreated").TrackValue(1);
+
         return product;
     }
 

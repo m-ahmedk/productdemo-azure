@@ -1,4 +1,6 @@
 ﻿using FluentAssertions;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using Moq;
 using ProductDemo.Models;
 using ProductDemo.Repositories.Interfaces;
@@ -9,12 +11,21 @@ namespace ProductDemo.Tests.Services;
 public class ProductServiceTests
 {
     private readonly Mock<IProductRepository> _repoMock;
+    private readonly TelemetryClient _telemetryClient;
     private readonly ProductService _sut; // system under test
 
     public ProductServiceTests()
     {
         _repoMock = new Mock<IProductRepository>();
-        _sut = new ProductService(_repoMock.Object);
+
+        // Create a no-op TelemetryClient (telemetry disabled for tests)
+        var telemetryConfig = new TelemetryConfiguration
+        {
+            DisableTelemetry = true
+        };
+        _telemetryClient = new TelemetryClient(telemetryConfig);
+
+        _sut = new ProductService(_repoMock.Object, _telemetryClient);
     }
 
     [Fact]
