@@ -1,13 +1,10 @@
 # ---------------------------------------------------
 # CI/CD Pipeline for Product API
 # Uses GitVersion (6.3.x) for semantic versioning
+# Deploys to Azure App Service (staging + prod) via ACR
 # ---------------------------------------------------
 name: CI/CD Pipeline
 
-# Push to main -> production build & push
-# Push to staging -> staging build & push
-# Push to feature/*, fix/*, etc. -> only build & test (no push)
-# PR to staging or main -> runs pipeline for validation
 on:
   push:
     branches:
@@ -23,40 +20,34 @@ on:
       - staging
       - main
 
-# Named jobs for better readability and workflow configurations
 jobs:
   # ---------------------------------------------------
-  # Job 1: Build (restore + compile)
+  # Job 1: Build
   # ---------------------------------------------------
   build:
     name: Build
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout full repo (history & tags required for GitVersion)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Ensure tags are present (GitVersion needs them)
       - name: Fetch tags
         run: git fetch --tags --prune --progress
 
-      # Install GitVersion (latest stable 6.3.x)
       - name: Install GitVersion
         uses: GitTools/actions/gitversion/setup@v4.1.0
         with:
           versionSpec: '6.3.x'
 
-      # Run GitVersion to calculate semantic version
       - name: Determine Version
         id: gitversion
         uses: GitTools/actions/gitversion/execute@v4.1.0
         with:
           configFilePath: GitVersion.yml
 
-      # Display GitVersion outputs (debugging/logging)
       - name: Display GitVersion outputs
         run: |
           echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
@@ -64,50 +55,45 @@ jobs:
           echo "NuGetVersionV2: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
           echo "AssemblySemVer: ${{ steps.gitversion.outputs.assemblySemVer }}"
 
-      # Setup .NET SDK
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # Restore NuGet dependencies
       - name: Restore dependencies
         run: dotnet restore
 
-      # Build project with version injected from GitVersion
       - name: Build
         run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.semVer }}
 
+    outputs:
+      semVer: ${{ steps.gitversion.outputs.semVer }}
+      fullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}
+
   # ---------------------------------------------------
-  # Job 2: Tests (unit/integration tests)
-  # Depends on Build
+  # Job 2: Tests
   # ---------------------------------------------------
   test:
     name: Tests
     runs-on: ubuntu-latest
-    needs: build   # Runs only if build succeeds
+    needs: build
 
     steps:
-      # Checkout repo again (fresh job = fresh VM)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Setup .NET SDK
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # Run test suite
       - name: Run Tests
         run: dotnet test --no-build --configuration Release --verbosity normal
 
   # ---------------------------------------------------
-  # Job 3: Deploy (DockerHub + Git tag)
-  # Depends on Build & Test
-  # Only runs for staging/main
+  # Job 3: Deploy (to ACR + Azure App Service)
   # ---------------------------------------------------
   deploy:
     name: Deploy
@@ -120,58 +106,82 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          fetch-tags: true
 
-      # Setup .NET (needed for docker builds using dotnet publish)
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # Login to DockerHub
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+      # 🔹 Login Azure (staging)
+      - name: Azure Login (Staging)
+        if: github.ref == 'refs/heads/staging'
+        uses: azure/login@v1
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID_STAGING }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID_STAGING }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET_STAGING }}
 
-      # Build & Push STAGING image
+      # 🔹 Login Azure (prod)
+      - name: Azure Login (Prod)
+        if: github.ref == 'refs/heads/main'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      # 🔹 Login to ACR
+      - name: Docker Login to ACR
+        run: az acr login --name productdemoacr
+
+      # 🔹 Build & Push Staging Image
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
         run: |
-          VERSION=${{ needs.build.outputs.semVer || 'latest' }}
-          echo "Building staging version $VERSION"
-          docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging \
-            -f ProductDemo/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:staging
+          VERSION=${{ needs.build.outputs.semVer || 'staging' }}
+          docker build -t productdemoacr.azurecr.io/product-api:$VERSION \
+                       -t productdemoacr.azurecr.io/product-api:staging \
+                       -f ProductDemo/Dockerfile .
+          docker push productdemoacr.azurecr.io/product-api:$VERSION
+          docker push productdemoacr.azurecr.io/product-api:staging
 
-      # Build & Push PRODUCTION image
+      - name: Deploy Staging WebApp
+        if: github.ref == 'refs/heads/staging'
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: productdemo-api-staging
+          images: productdemoacr.azurecr.io/product-api:staging
+
+      # 🔹 Build & Push Prod Image
       - name: Build & Push Prod Image
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main'
         run: |
           VERSION=${{ needs.build.outputs.semVer || 'latest' }}
-          echo "Building production version $VERSION"
-          docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest \
-            -f ProductDemo/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:$VERSION
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
+          docker build -t productdemoacr.azurecr.io/product-api:$VERSION \
+                       -t productdemoacr.azurecr.io/product-api:latest \
+                       -f ProductDemo/Dockerfile .
+          docker push productdemoacr.azurecr.io/product-api:$VERSION
+          docker push productdemoacr.azurecr.io/product-api:latest
 
-      # Configure Git auth for tagging
+      - name: Deploy Prod WebApp
+        if: github.ref == 'refs/heads/main'
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: productdemo-api
+          images: productdemoacr.azurecr.io/product-api:latest
+
+      # 🔹 Tag release in Git (only for main)
       - name: Configure Git auth
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
 
-      # Create Git tag for release
       - name: Create Git tag
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main'
         run: |
           VERSION=${{ needs.build.outputs.semVer || 'latest' }}
           git tag v$VERSION
