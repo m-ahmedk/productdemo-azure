@@ -1,4 +1,6 @@
 ﻿using FluentAssertions;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using Moq;
 using ProductDemo.DTOs.Auth;
 using ProductDemo.Helpers;
@@ -13,13 +15,22 @@ public class AuthServiceTests
 {
     private readonly Mock<IUserRepository> _userRepoMock;
     private readonly Mock<IAuthTokenService> _tokenServiceMock;
+    private readonly TelemetryClient _telemetryClient;
     private readonly AuthService _sut; // System Under Test
 
     public AuthServiceTests()
     {
         _userRepoMock = new Mock<IUserRepository>();
         _tokenServiceMock = new Mock<IAuthTokenService>();
-        _sut = new AuthService(_userRepoMock.Object, _tokenServiceMock.Object);
+
+        // Create a no-op TelemetryClient (telemetry disabled for tests)
+        var telemetryConfig = new TelemetryConfiguration
+        {
+            DisableTelemetry = true
+        };
+        _telemetryClient = new TelemetryClient(telemetryConfig);
+
+        _sut = new AuthService(_userRepoMock.Object, _tokenServiceMock.Object, _telemetryClient);
     }
 
     [Fact]

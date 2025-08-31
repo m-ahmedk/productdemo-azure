@@ -3,6 +3,7 @@ using ProductDemo.Data;
 using ProductDemo.Extensions;
 using ProductDemo.Logging;
 using Serilog;
+using Azure.Identity; // Needed for Key Vault
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,16 +11,27 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration
        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
-        .AddEnvironmentVariables();  // load env first
+       .AddEnvironmentVariables();
 
-
+// Local dev only -> still support user-secrets
 if (builder.Environment.IsDevelopment())
 {
     builder.Configuration.AddUserSecrets<Program>();
 }
 
+// Staging / Prod -> load Key Vault
+if (builder.Environment.IsStaging() || builder.Environment.IsProduction())
+{
+    var keyVaultName = builder.Configuration["KeyVaultName"];
+    if (!string.IsNullOrEmpty(keyVaultName))
+    {
+        var vaultUri = new Uri($"https://{keyVaultName}.vault.azure.net/");
+        builder.Configuration.AddAzureKeyVault(vaultUri, new DefaultAzureCredential());
+    }
+}
+
 // Logging
-LogConfigurator.ConfigureLogging(builder.Configuration);
+LogConfigurator.ConfigureLogging(builder.Configuration, builder.Environment.EnvironmentName); // pass env for log configuration
 builder.Host.UseSerilog();
 
 // Services
@@ -44,6 +56,12 @@ builder.Services.AddProjectMappings();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
+
+// Telemetry
+builder.Services.AddApplicationInsightsTelemetry(options =>
+{
+    options.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+});
 
 var app = builder.Build();
 
