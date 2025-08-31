@@ -135,36 +135,36 @@ jobs:
         if: github.ref == 'refs/heads/staging'
         run: |
           VERSION=${{ needs.build.outputs.semVer || 'staging' }}
-          docker build -t productdemoacr.azurecr.io/product-api:$VERSION \
-                       -t productdemoacr.azurecr.io/product-api:staging \
+          docker build -t productdemoacr.azurecr.io/productdemo-api:$VERSION \
+                       -t productdemoacr.azurecr.io/productdemo-api:staging \
                        -f ProductDemo/Dockerfile .
-          docker push productdemoacr.azurecr.io/product-api:$VERSION
-          docker push productdemoacr.azurecr.io/product-api:staging
+          docker push productdemoacr.azurecr.io/productdemo-api:$VERSION
+          docker push productdemoacr.azurecr.io/productdemo-api:staging
 
       - name: Deploy Staging WebApp
         if: github.ref == 'refs/heads/staging'
         uses: azure/webapps-deploy@v2
         with:
           app-name: productdemo-api-staging
-          images: productdemoacr.azurecr.io/product-api:staging
+          images: productdemoacr.azurecr.io/productdemo-api:staging
 
       # Build & Push Prod Image
       - name: Build & Push Prod Image
         if: github.ref == 'refs/heads/main'
         run: |
           VERSION=${{ needs.build.outputs.semVer || 'latest' }}
-          docker build -t productdemoacr.azurecr.io/product-api:$VERSION \
-                       -t productdemoacr.azurecr.io/product-api:latest \
+          docker build -t productdemoacr.azurecr.io/productdemo-api:$VERSION \
+                       -t productdemoacr.azurecr.io/productdemo-api:latest \
                        -f ProductDemo/Dockerfile .
-          docker push productdemoacr.azurecr.io/product-api:$VERSION
-          docker push productdemoacr.azurecr.io/product-api:latest
+          docker push productdemoacr.azurecr.io/productdemo-api:$VERSION
+          docker push productdemoacr.azurecr.io/productdemo-api:latest
 
       - name: Deploy Prod WebApp
         if: github.ref == 'refs/heads/main'
         uses: azure/webapps-deploy@v2
         with:
           app-name: productdemo-api
-          images: productdemoacr.azurecr.io/product-api:latest
+          images: productdemoacr.azurecr.io/productdemo-api:latest
 
       # Tag release in Git (only for main)
       - name: Configure Git auth
