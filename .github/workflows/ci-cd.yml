@@ -130,6 +130,10 @@ jobs:
       - name: Docker Login to ACR
         run: az acr login --name productdemoacr
 
+      # List WebApps
+      - name: Debug - List App Services
+        run: az webapp list --resource-group rg-productdemo --output table
+
       # Build & Push Staging Image
       - name: Build & Push Staging Image
         if: github.ref == 'refs/heads/staging'
