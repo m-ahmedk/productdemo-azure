@@ -47,6 +47,7 @@ if (!builder.Environment.IsEnvironment("Test"))
 
 builder.Services.AddCustomBinders();
 builder.Services.AddCustomJsonConverters();
+builder.Services.AddCorsPolicies();
 builder.Services.AddSwaggerDocument();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddProjectRepositories();
@@ -79,6 +80,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors("AllowAngularDev");
+}
 
 // Run migrations + seed, and exclude test environment from this
 if (!app.Environment.IsEnvironment("Test"))
